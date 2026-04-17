@@ -8352,6 +8352,12 @@ function tapToggleSetup(){
     if(el('tap-brewery-name')) el('tap-brewery-name').value = s.brewery||'';
     if(el('tap-handle'))       el('tap-handle').value       = s.handle||'';
     if(el('tap-count'))        el('tap-count').value        = s.tapCount||3;
+    if(el('tap-tagline'))      el('tap-tagline').value      = s.tagline||'';
+    if(el('tap-accent-color') && s.accentColor) el('tap-accent-color').value = s.accentColor;
+    if(s.handle && s.handle.length > 2){
+      const msg = el('tap-handle-msg');
+      if(msg) msg.textContent = '✓ Looks good';
+    }
     tapUpdateUrlDisplay();
     tapHydrateBranding();
     setTimeout(()=>{ initTapCustomColorsPanel(); tapLivePreview(); }, 0);
@@ -8883,6 +8889,11 @@ async function tapLoadFromCloud(){
   if(Array.isArray(p.slots)) tapState.slots = p.slots;
   renderTapBoard();
   tapSetStatus('☁ Tap board loaded','ok');
+  // Restore handle field and URL display immediately after cloud load
+  const s = p.settings || {};
+  const handleEl = document.getElementById('tap-handle');
+  if(handleEl && s.handle) handleEl.value = s.handle;
+  tapUpdateUrlDisplay();
   await tapLoadRatings();
 }
 
