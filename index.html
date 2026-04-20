@@ -1484,29 +1484,91 @@ button[onclick="connectSupabase(true)"]{display:none!important}
 
 
 <!-- PASSWORD SETUP MODAL — shown automatically when user clicks recovery link from email -->
+<!-- PASSWORD SETUP MODAL — shown automatically when user clicks recovery link from email -->
 <div class="modal-overlay" id="password-setup-overlay" aria-hidden="true" style="z-index:1200">
-  <div class="modal-card" style="max-width:420px">
-    <div class="modal-head">
-      <div>
-        <div class="modal-title">🎉 Welcome to EzBrewDay Pro!</div>
-        <div class="hdr-sub">Create your password to finish setting up your account.</div>
+  <div class="modal-card" style="max-width:460px">
+
+    <!-- NORMAL: password setup form -->
+    <div id="setup-form-panel">
+      <div class="modal-head" style="border-bottom:none;padding-bottom:0">
+        <div style="width:100%;text-align:center;padding:8px 0 4px">
+          <div style="font-size:36px;margin-bottom:6px">🍺</div>
+          <div class="modal-title" style="font-size:20px">Welcome to EzBrewDay Pro!</div>
+          <div style="font-size:12.5px;color:var(--text3);margin-top:4px">One last step — choose a password to secure your account.</div>
+        </div>
+      </div>
+      <div class="modal-body" style="padding-top:12px">
+        <!-- Step indicator -->
+        <div style="display:flex;align-items:center;gap:0;margin-bottom:20px">
+          <div style="flex:1;text-align:center;font-size:11px;font-weight:700;color:var(--green)">
+            <div style="width:22px;height:22px;border-radius:50%;background:var(--green);color:#000;display:inline-flex;align-items:center;justify-content:center;font-size:11px;margin-bottom:3px">✓</div>
+            <div>Purchased</div>
+          </div>
+          <div style="flex:1;height:2px;background:var(--green);margin-top:-16px"></div>
+          <div style="flex:1;text-align:center;font-size:11px;font-weight:700;color:var(--green)">
+            <div style="width:22px;height:22px;border-radius:50%;background:var(--green);color:#000;display:inline-flex;align-items:center;justify-content:center;font-size:11px;margin-bottom:3px">✓</div>
+            <div>Account Created</div>
+          </div>
+          <div style="flex:1;height:2px;background:var(--teal);margin-top:-16px"></div>
+          <div style="flex:1;text-align:center;font-size:11px;font-weight:700;color:var(--teal)">
+            <div style="width:22px;height:22px;border-radius:50%;background:var(--teal);color:#000;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;margin-bottom:3px">3</div>
+            <div>Set Password</div>
+          </div>
+        </div>
+
+        <div style="background:var(--teal3);border:1px solid rgba(20,184,166,.2);border-radius:8px;padding:11px 14px;margin-bottom:16px;font-size:12px;color:var(--text2);line-height:1.55">
+          ✅ Your <strong style="color:var(--teal)">Pro license is active</strong>. Set a password below and you'll have instant access to all Pro features — cloud recipes, themes, ingredient libraries, and more.
+        </div>
+
+        <label class="fl">Your Email</label>
+        <input type="text" id="setup-email" disabled style="opacity:.55;margin-bottom:14px;background:var(--bg3)">
+
+        <label class="fl">Choose a Password</label>
+        <input type="password" id="setup-password" placeholder="At least 6 characters" style="margin-bottom:10px" oninput="setupPasswordStrength()">
+        <div id="setup-strength-bar" style="height:4px;border-radius:2px;background:var(--bg4);margin-bottom:10px;overflow:hidden">
+          <div id="setup-strength-fill" style="height:100%;width:0%;border-radius:2px;transition:width .3s,background .3s"></div>
+        </div>
+
+        <label class="fl">Confirm Password</label>
+        <input type="password" id="setup-password-confirm" placeholder="Repeat your password" style="margin-bottom:16px">
+
+        <button class="btn btn-primary" type="button" onclick="submitPasswordSetup()" style="width:100%;justify-content:center;padding:12px;font-size:14px">
+          🚀 Set Password &amp; Start Brewing
+        </button>
+        <div id="setup-status" class="cloud-status" style="margin-top:10px;text-align:center"></div>
+
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);text-align:center;line-height:1.5">
+          You'll use this email and password every time you sign in.<br>
+          Having trouble? <button type="button" onclick="showCloudModal()" style="background:none;border:none;color:var(--teal);cursor:pointer;font-size:11px;text-decoration:underline;padding:0">Open Account Login</button>
+        </div>
       </div>
     </div>
-    <div class="modal-body">
-      <div style="background:var(--teal3);border:1px solid rgba(20,184,166,.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12.5px;color:var(--text2);line-height:1.5">
-        ✅ Your Pro license is active. Just set a password below and you're all set — you'll use this every time you sign in.
+
+    <!-- EXPIRED LINK: shown if token is missing or expired -->
+    <div id="setup-expired-panel" style="display:none">
+      <div class="modal-head" style="border-bottom:none">
+        <div style="width:100%;text-align:center;padding:8px 0 4px">
+          <div style="font-size:36px;margin-bottom:6px">⏰</div>
+          <div class="modal-title" style="font-size:18px">Setup Link Expired</div>
+          <div style="font-size:12.5px;color:var(--text3);margin-top:4px">No problem — we can send you a new one instantly.</div>
+        </div>
       </div>
-      <label class="fl">Email</label>
-      <input type="text" id="setup-email" disabled style="opacity:.6;margin-bottom:12px">
-      <label class="fl">New Password</label>
-      <input type="password" id="setup-password" placeholder="At least 6 characters" style="margin-bottom:10px">
-      <label class="fl">Confirm Password</label>
-      <input type="password" id="setup-password-confirm" placeholder="Repeat your password" style="margin-bottom:14px">
-      <div class="inline-actions">
-        <button class="btn btn-primary" type="button" onclick="submitPasswordSetup()" style="width:100%;justify-content:center;padding:10px">Set Password &amp; Start Brewing</button>
+      <div class="modal-body">
+        <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--text2);line-height:1.55">
+          ⚠️ This setup link has expired (links are valid for 24 hours). Enter your purchase email below and we'll send a fresh link right away.
+        </div>
+        <label class="fl">Your Purchase Email</label>
+        <input type="text" id="setup-expired-email" placeholder="you@example.com" style="margin-bottom:12px">
+        <button class="btn btn-primary" type="button" onclick="resendSetupEmail()" style="width:100%;justify-content:center;padding:11px">
+          📧 Send New Setup Link
+        </button>
+        <div id="setup-expired-status" class="cloud-status" style="margin-top:10px;text-align:center"></div>
+        <div style="margin-top:12px;font-size:11px;color:var(--text3);text-align:center">
+          Already set your password? <button type="button" onclick="document.getElementById('password-setup-overlay').classList.remove('show');showCloudModal();" style="background:none;border:none;color:var(--teal);cursor:pointer;font-size:11px;text-decoration:underline;padding:0">Sign in here</button>
+        </div>
       </div>
-      <div id="setup-status" class="cloud-status" style="margin-top:10px"></div>
     </div>
+
   </div>
 </div>
 
@@ -3048,6 +3110,24 @@ function blobDownload(e,t){const a=URL.createObjectURL(e),n=document.createEleme
 });
 
 /** Called on page load — detects a Supabase recovery link in the URL hash */
+/** Password strength meter */
+function setupPasswordStrength(){
+  const pw = document.getElementById('setup-password')?.value || '';
+  const fill = document.getElementById('setup-strength-fill');
+  if(!fill) return;
+  let strength = 0;
+  if(pw.length >= 6) strength++;
+  if(pw.length >= 10) strength++;
+  if(/[A-Z]/.test(pw)) strength++;
+  if(/[0-9]/.test(pw)) strength++;
+  if(/[^A-Za-z0-9]/.test(pw)) strength++;
+  const pct = (strength / 5) * 100;
+  const color = strength <= 1 ? '#f87171' : strength <= 3 ? '#fbbf24' : '#34d399';
+  fill.style.width = pct + '%';
+  fill.style.background = color;
+}
+
+/** Called on page load — detects a Supabase recovery link in the URL hash */
 async function checkForPasswordRecovery(){
   const hash = window.location.hash;
   if(!hash || !hash.includes('type=recovery')) return;
@@ -3056,14 +3136,22 @@ async function checkForPasswordRecovery(){
   const params = new URLSearchParams(hash.replace('#',''));
   const accessToken  = params.get('access_token');
   const refreshToken = params.get('refresh_token');
-  if(!accessToken) return;
 
   // Clear the hash from the URL so it doesn't linger
   window.history.replaceState(null,'',window.location.pathname);
 
+  // If no token in URL, show the expired panel
+  if(!accessToken){
+    showSetupExpiredPanel();
+    return;
+  }
+
   // Connect to Supabase and set the session using the tokens from the link
   await connectSupabase(false);
-  if(!cloudState.client) return;
+  if(!cloudState.client){
+    showSetupExpiredPanel();
+    return;
+  }
 
   const { data, error } = await cloudState.client.auth.setSession({
     access_token:  accessToken,
@@ -3072,14 +3160,60 @@ async function checkForPasswordRecovery(){
 
   if(error || !data?.user){
     console.warn('Could not restore session from recovery link:', error?.message);
+    // Show expired panel — likely the token is stale
+    showSetupExpiredPanel();
     return;
   }
 
-  // Session is live — show the password setup modal
+  // Session is live — show the password setup form
   cloudState.user = data.user;
   const emailEl = document.getElementById('setup-email');
   if(emailEl) emailEl.value = data.user.email || '';
+  // Pre-fill expired email field too in case they switch panels
+  const expiredEmailEl = document.getElementById('setup-expired-email');
+  if(expiredEmailEl) expiredEmailEl.value = data.user.email || '';
+  showSetupFormPanel();
+}
+
+function showSetupFormPanel(){
+  document.getElementById('setup-form-panel').style.display = '';
+  document.getElementById('setup-expired-panel').style.display = 'none';
   document.getElementById('password-setup-overlay')?.classList.add('show');
+}
+
+function showSetupExpiredPanel(){
+  document.getElementById('setup-form-panel').style.display = 'none';
+  document.getElementById('setup-expired-panel').style.display = '';
+  document.getElementById('password-setup-overlay')?.classList.add('show');
+}
+
+/** Resend a fresh setup email when the link has expired */
+async function resendSetupEmail(){
+  const email = (document.getElementById('setup-expired-email')?.value || '').trim().toLowerCase();
+  const status = document.getElementById('setup-expired-status');
+  if(!email || !email.includes('@')){
+    if(status){ status.textContent='Please enter your purchase email address.'; status.className='cloud-status bad'; }
+    return;
+  }
+  if(!await connectSupabase(false)){
+    if(status){ status.textContent='Connection error — please refresh and try again.'; status.className='cloud-status bad'; }
+    return;
+  }
+  if(status){ status.textContent='Sending…'; status.className='cloud-status'; }
+  const { error } = await cloudState.client.auth.signInWithOtp({
+    email,
+    options:{ shouldCreateUser: false, emailRedirectTo: window.location.href }
+  });
+  if(error){
+    if(status){
+      status.textContent = error.message.toLowerCase().includes('not found') || error.message.toLowerCase().includes('invalid')
+        ? '⚠️ No account found for that email. Make sure you use the exact email from your Stripe receipt.'
+        : 'Error: ' + error.message;
+      status.className='cloud-status bad';
+    }
+    return;
+  }
+  if(status){ status.textContent='✅ New setup link sent! Check your inbox (and spam folder).'; status.className='cloud-status ok'; }
 }
 
 /** Handles the "Set Password" button in the setup modal */
@@ -3090,24 +3224,31 @@ async function submitPasswordSetup(){
 
   if(pw.length < 6){
     if(status){ status.textContent='Password must be at least 6 characters.'; status.className='cloud-status bad'; }
+    document.getElementById('setup-password')?.focus();
     return;
   }
   if(pw !== pw2){
-    if(status){ status.textContent="Passwords don't match."; status.className='cloud-status bad'; }
+    if(status){ status.textContent="Passwords don't match — please re-enter."; status.className='cloud-status bad'; }
+    document.getElementById('setup-password-confirm')?.focus();
     return;
   }
 
-  if(status){ status.textContent='Saving…'; status.className='cloud-status'; }
+  if(status){ status.textContent='Saving your password…'; status.className='cloud-status'; }
+  const btn = document.querySelector('#setup-form-panel .btn-primary');
+  if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
 
   const { error } = await cloudState.client.auth.updateUser({ password: pw });
 
   if(error){
     if(status){ status.textContent='Error: ' + error.message; status.className='cloud-status bad'; }
+    if(btn){ btn.disabled=false; btn.innerHTML='🚀 Set Password &amp; Start Brewing'; }
     return;
   }
 
-  // Password set — close modal, finish signing in
-  if(status){ status.textContent='✅ Password saved!'; status.className='cloud-status ok'; }
+  // Password set successfully!
+  if(status){ status.textContent='✅ Password saved! Welcome to EzBrewDay Pro 🍺'; status.className='cloud-status ok'; }
+  if(btn){ btn.textContent='✅ Done!'; }
+
   setTimeout(async ()=>{
     document.getElementById('password-setup-overlay')?.classList.remove('show');
     await refreshServerProStatus(false);
@@ -3115,7 +3256,7 @@ async function submitPasswordSetup(){
     refreshCloudModalAccess();
     refreshProUI();
     forceUnlockCommunity();
-  }, 800);
+  }, 1200);
 }
 </script>
 
