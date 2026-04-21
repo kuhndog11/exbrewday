@@ -3139,48 +3139,39 @@ async function checkForPasswordRecovery(){
   const search = window.__recoverySearch || window.location.search;
 
   const hashParams   = new URLSearchParams(hash.replace('#',''));
-  const searchParams = new URLSearchParams(search);
-
   const isHashRecovery  = hash.includes('type=recovery');
   const isHashMagicLink = hash.includes('type=magiclink') || hash.includes('type=signup');
-  const hasCode         = searchParams.has('code');
+  const hasCode         = new URLSearchParams(search).has('code');
 
   if(!isHashRecovery && !isHashMagicLink && !hasCode) return;
 
   // Clear URL immediately so tokens don't linger
   window.history.replaceState(null,'',window.location.pathname);
 
-  // Use existing client if available — do NOT create a new one (causes lock conflicts)
-  if(!cloudState.client){
-    await connectSupabase(false);
+  // Supabase JS auto-processes the hash token on init and signs the user in.
+  // We just need to wait for cloudState.user to be populated by the normal
+  // auth flow, then show the setup modal.
+  // Poll for up to 8 seconds for cloudState.user to be set.
+  let user = cloudState.user || null;
+  if(!user){
+    for(let i = 0; i < 16; i++){
+      await new Promise(r => setTimeout(r, 500));
+      user = cloudState.user || null;
+      if(user) break;
+    }
   }
-  if(!cloudState.client){ showSetupExpiredPanel(); return; }
 
-  let user = null;
-
-  if(isHashRecovery || isHashMagicLink){
-    const accessToken  = hashParams.get('access_token');
-    const refreshToken = hashParams.get('refresh_token') || '';
-    if(!accessToken){ showSetupExpiredPanel(); return; }
-    const { data, error } = await cloudState.client.auth.setSession({
-      access_token:  accessToken,
-      refresh_token: refreshToken
-    });
-    if(error || !data?.user){
-      console.warn('setSession failed:', error?.message);
-      showSetupExpiredPanel();
-      return;
+  if(!user){
+    // As a last resort try getSession on the existing client
+    if(cloudState.client){
+      const { data } = await cloudState.client.auth.getSession();
+      user = data?.session?.user || null;
     }
-    user = data.user;
+  }
 
-  } else if(hasCode){
-    const { data, error } = await cloudState.client.auth.exchangeCodeForSession(search);
-    if(error || !data?.user){
-      console.warn('exchangeCodeForSession failed:', error?.message);
-      showSetupExpiredPanel();
-      return;
-    }
-    user = data.user;
+  if(!user){
+    showSetupExpiredPanel();
+    return;
   }
 
   if(!user){ showSetupExpiredPanel(); return; }
