@@ -5823,7 +5823,7 @@ window.addEventListener("load", renderThemeGrid);
     </div>
   </div>
   <div class="gen-actions">
-    <button class="btn btn-primary" id="gen-recipe-btn" type="button" onclick="event.stopImmediatePropagation();window.generateBJCPRecipe();">Generate Recipe</button>
+    <button class="btn btn-primary" id="gen-recipe-btn" type="button" onclick="event.stopImmediatePropagation();window._definitiveGenerate();">Generate Recipe</button>
   </div>
   <div class="gen-note" id="gen-help-note">The style selected on the main recipe screen will be carried into this popup when a matching style profile exists.</div>
   <div class="gen-preview" 
@@ -6753,74 +6753,7 @@ function applyGeneratedRecipe(){
 
   const originalGenerate = window.generateBJCPRecipe;
   window.generateBJCPRecipe = function(){
-    try{
-      const styleEl = document.getElementById('gen-style');
-      const intentEl = document.getElementById('gen-intent');
-
-      if(!styleEl){
-        safeGenPreview('Generator could not find the style dropdown inside the modal.');
-        return;
-      }
-      if(!intentEl){
-        safeGenPreview('Generator could not find the intent selector inside the modal.');
-        return;
-      }
-
-      // Sync style from main screen before lookup
-      const mainStyle = document.getElementById('beerStyle');
-      if(mainStyle && mainStyle.value){
-        const mainText = (mainStyle.options[mainStyle.selectedIndex]?.text || mainStyle.value || '').trim();
-        const norm = s => String(s||'').toLowerCase().trim();
-        const match = Array.from(styleEl.options).find(o => norm(o.text) === norm(mainText) || norm(o.value) === norm(mainText));
-        if(match) styleEl.value = match.value;
-      }
-
-      const style = styleEl.value || 'American IPA';
-      const intent = intentEl.value || 'Balanced';
-
-      if(typeof window.bjcpGeneratorProfiles === 'undefined'){
-        safeGenPreview('Generator profiles were not loaded.');
-        return;
-      }
-      const base = window.bjcpGeneratorProfiles[style];
-      if(!base){
-        safeGenPreview('No starter recipe profile exists yet for "' + style + '".');
-        return;
-      }
-
-      if(typeof window.applyIntentToProfile !== 'function' ||
-         typeof window.getBatchGallons !== 'function' ||
-         typeof window.avg !== 'function' ||
-         typeof window.roundTo !== 'function' ||
-         typeof window.estimateGrainWeights !== 'function' ||
-         typeof window.renderGenPreview !== 'function'){
-        safeGenPreview('One or more generator helper functions are missing.');
-        return;
-      }
-
-      const profile = window.applyIntentToProfile(base, intent);
-      const gallons = window.getBatchGallons();
-      const og = window.avg(profile.og);
-      const fg = window.avg(profile.fg);
-
-      const recipe = {
-        style,
-        intent,
-        og: window.roundTo(og, 3),
-        fg: window.roundTo(fg, 3),
-        ibu: Math.round(window.avg(profile.ibu)),
-        srm: Math.round(window.avg(profile.srm)),
-        grains: window.estimateGrainWeights(profile.grains, og, gallons),
-        hops: profile.hops,
-        yeast: profile.yeast
-      };
-
-      window.lastGeneratedRecipe = recipe;
-      window.renderGenPreview(recipe);
-    } catch(err){
-      console.error('Style generator error:', err);
-      safeGenPreview('Generator hit an error: ' + (err && err.message ? err.message : err));
-    }
+    return originalGenerate();
   };
 
   function bindGenerateButton(){ /* disabled — button uses onclick attribute directly */ }
@@ -6889,20 +6822,9 @@ function applyGeneratedRecipe(){
   };
 
   const originalGenerateBJCPRecipe = window.generateBJCPRecipe;
-  window.generateBJCPRecipe = function(){
-    syncGeneratorStyleFromMain();
-    return originalGenerateBJCPRecipe();
-  };
+  window.generateBJCPRecipe = function(){ return originalGenerateBJCPRecipe(); };
 
-  const btn = document.getElementById('bjcp-generate-btn');
-  if(btn && !btn.dataset.syncbound){
-    btn.dataset.syncbound = '1';
-    btn.addEventListener('click', function(){
-      setTimeout(syncGeneratorStyleFromMain, 0);
-    });
-  }
-
-  setTimeout(syncGeneratorStyleFromMain, 50);
+  // Removed: setTimeout syncGeneratorStyleFromMain was overwriting style after generation
 })();
 </script>
 
@@ -7480,17 +7402,7 @@ function regenerateVariation(){
 }
 
 function enhanceGenerate(){
-  const original = window.generateBJCPRecipe;
-  window.generateBJCPRecipe = function(){
-    // Clear lastGeneratedRecipe BEFORE calling original so adjustRecipe
-    // only runs on the NEW recipe, not the previous style's recipe
-    window.lastGeneratedRecipe = null;
-    original();
-    if(window.lastGeneratedRecipe){
-      adjustRecipe(window.lastGeneratedRecipe);
-      if(typeof renderGenPreview === 'function') renderGenPreview(window.lastGeneratedRecipe);
-    }
-  };
+  // Disabled — definitive generateBJCPRecipe handles everything
 }
 
 function bindAdvanced(){
@@ -7568,39 +7480,7 @@ setTimeout(bindAdvanced, 500);
     return String(amountText).replace(m[0], scaled.toFixed(2));
   }
 
-  window.generateBJCPRecipe = function(){
-    const style = document.getElementById('gen-style')?.value || 'American IPA';
-    const intent = document.getElementById('gen-intent')?.value || 'Balanced';
-    const base = window.bjcpGeneratorProfiles?.[style];
-    if(!base){
-      const preview = document.getElementById('gen-preview');
-      if(preview) preview.innerHTML = '<div class="gen-error">No generator profile exists for this style yet.</div>';
-      return;
-    }
-
-    const profile = applyIntentToProfile(base, intent);
-    const gallons = window.getBatchGallons();
-    const og = avg(profile.og);
-    const fg = avg(profile.fg);
-    const hopScaleFactor = gallons / 5; // generator recipes are authored around 5 gal
-
-    const recipe = {
-      style,
-      intent,
-      batchGallons: roundTo(gallons, 2),
-      efficiency: roundTo(window.getMashEfficiency() * 100, 1),
-      og: roundTo(og, 3),
-      fg: roundTo(fg, 3),
-      ibu: Math.round(avg(profile.ibu)),
-      srm: Math.round(avg(profile.srm)),
-      grains: estimateGrainWeights(profile.grains, og, gallons),
-      hops: profile.hops.map(h => ({...h, amt: scaleHopAmountText(h.amt, hopScaleFactor)})),
-      yeast: profile.yeast
-    };
-
-    window.lastGeneratedRecipe = recipe;
-    if(typeof renderGenPreview === 'function') renderGenPreview(recipe);
-  };
+  window.generateBJCPRecipe = function(){ /* passthrough — definitive fn is last */ };
 
   // Also show batch + efficiency context in the preview
   const oldRender = window.renderGenPreview;
@@ -8157,59 +8037,7 @@ setTimeout(bindAdvanced, 500);
     return String(sel.value || '').trim();
   }
 
-  window.generateBJCPRecipe = function(){
-    const intent = document.getElementById('gen-intent')?.value || 'Balanced';
-    const styleLabel = getGeneratorSelectedLabel() || getMainStyleLabel();
-    const styleRow = getStyleDbRow(styleLabel);
-    const base = styleRow ? buildProfileFromStyle(styleRow) : null;
-
-    if(!base){
-      const preview = document.getElementById('gen-preview');
-      if(preview){
-        preview.innerHTML = '<div class="gen-error">I could not match that style to the style library yet.</div>';
-      }
-      return;
-    }
-
-    const profile = applyIntentToProfile(JSON.parse(JSON.stringify(base)), intent);
-    const gallons = window.getBatchGallons ? window.getBatchGallons() : 5;
-    const og = avg(profile.og);
-    const fg = avg(profile.fg);
-    const hopScaleFactor = gallons / 5;
-
-    const recipe = {
-      style: base.name,
-      styleCode: base.code,
-      intent,
-      batchGallons: roundTo(gallons, 2),
-      efficiency: roundTo((window.getMashEfficiency ? window.getMashEfficiency() : 0.7) * 100, 1),
-      og: roundTo(og, 3),
-      fg: roundTo(fg, 3),
-      ibu: Math.round(avg(profile.ibu)),
-      srm: Math.round(avg(profile.srm)),
-      grains: estimateGrainWeights(profile.grains, og, gallons),
-      hops: profile.hops.map(h => ({...h, amt: (function(txt){ const m=String(txt||'').match(/[\d.]+/); if(!m) return txt; const oz=Math.max(0.1, parseFloat(m[0])*hopScaleFactor); return String(txt).replace(m[0], oz.toFixed(2)); })(h.amt)})),
-      yeast: profile.yeast,
-      why: [
-        'Built from the selected style targets and your live batch volume.',
-        'Grain bill and hop schedule are chosen from a style-family template matched to ' + base.name + '.',
-        'Targets use the midpoint of the style target ranges for ' + base.name + '.'
-      ]
-    };
-
-    window.lastGeneratedRecipe = recipe;
-    if(typeof renderGenPreview === 'function'){
-      renderGenPreview(recipe);
-      const preview = document.getElementById('gen-preview');
-      if(preview){
-        const note = document.createElement('div');
-        note.className = 'notebox';
-        note.style.marginTop = '10px';
-        note.innerHTML = '<strong>Why this works</strong><div style="margin-top:6px">' + recipe.why.map(x => '• ' + x).join('<br>') + '</div>';
-        preview.appendChild(note);
-      }
-    }
-  };
+  window.generateBJCPRecipe = function(){ /* passthrough — definitive fn is last */ };
 
   // refreshBJCPGeneratorLibrary disabled — bjcpGeneratorProfiles is set directly
   function refreshBJCPGeneratorLibrary(){ /* no-op — profiles set at definition */ }
@@ -8783,58 +8611,7 @@ setTimeout(bindAdvanced, 500);
   }
 
   const _oldGenerate = window.generateBJCPRecipe;
-  window.generateBJCPRecipe = function(){
-    const styleSel = document.getElementById('gen-style');
-    const styleLabel = styleSel ? (styleSel.options[styleSel.selectedIndex]?.text || styleSel.value || '') : '';
-    const styleRow = getStyleByCodeOnly(styleLabel);
-    if(!styleRow){
-      return _oldGenerate ? _oldGenerate() : null;
-    }
-
-    let base = authenticProfileForCode(styleRow);
-    if(!base){
-      return _oldGenerate ? _oldGenerate() : null;
-    }
-
-    const intent = document.getElementById('gen-intent')?.value || 'Balanced';
-    const profile = applyIntentToProfile(JSON.parse(JSON.stringify(base)), intent);
-    const gallons = window.getBatchGallons ? window.getBatchGallons() : 5;
-    const og = avg(profile.og);
-    const fg = avg(profile.fg);
-    const hopScaleFactor = gallons / 5;
-
-    const recipe = {
-      style: base.name,
-      styleCode: base.code,
-      intent,
-      batchGallons: roundTo(gallons, 2),
-      efficiency: roundTo((window.getMashEfficiency ? window.getMashEfficiency() : 0.7) * 100, 1),
-      og: roundTo(og, 3),
-      fg: roundTo(fg, 3),
-      ibu: Math.round(avg(profile.ibu)),
-      srm: Math.round(avg(profile.srm)),
-      grains: estimateGrainWeights(profile.grains, og, gallons),
-      hops: profile.hops.map(h => ({...h, amt: (function(txt){ const m=String(txt||'').match(/[\d.]+/); if(!m) return txt; const oz=Math.max(0.1, parseFloat(m[0])*hopScaleFactor); return String(txt).replace(m[0], oz.toFixed(2)); })(h.amt)})),
-      yeast: profile.yeast,
-      why: base.why && base.why.length ? base.why : [
-        'This recipe is matched directly to the selected style profile.',
-        'Grain bill, hop expression, and yeast were tuned to the authentic style family for ' + base.name + '.'
-      ]
-    };
-
-    window.lastGeneratedRecipe = recipe;
-    if(typeof renderGenPreview === 'function'){
-      renderGenPreview(recipe);
-      const preview = document.getElementById('gen-preview');
-      if(preview){
-        const note = document.createElement('div');
-        note.className = 'notebox';
-        note.style.marginTop = '10px';
-        note.innerHTML = '<strong>Why this works</strong><div style="margin-top:6px">' + recipe.why.map(x => '• ' + x).join('<br>') + '</div>';
-        preview.appendChild(note);
-      }
-    }
-  };
+  window.generateBJCPRecipe = function(){ return _oldGenerate(); };
 })();
 </script>
 
@@ -8911,83 +8688,7 @@ setTimeout(bindAdvanced, 500);
 
   // Hard override the generator to use the new robust matcher first.
   const _previousGenerate = window.generateBJCPRecipe;
-  window.generateBJCPRecipe = function(){
-    const styleSel = document.getElementById('gen-style');
-    const styleLabel = styleSel
-      ? String(styleSel.options?.[styleSel.selectedIndex]?.text || styleSel.value || '').trim()
-      : '';
-    const styleRow = window.getStyleByCodeOnly(styleLabel);
-
-    if(!styleRow){
-      const preview = document.getElementById('gen-preview');
-      if(preview){
-        preview.innerHTML = '<div class="gen-error">I could not match that style to the style library yet.</div>';
-      }
-      return;
-    }
-
-    if (typeof authenticProfileForCode !== 'function') {
-      if (typeof _previousGenerate === 'function') return _previousGenerate();
-      return;
-    }
-
-    let base = authenticProfileForCode(styleRow);
-    if(!base){
-      if (typeof _previousGenerate === 'function') return _previousGenerate();
-      const preview = document.getElementById('gen-preview');
-      if(preview){
-        preview.innerHTML = '<div class="gen-error">A style-authentic profile has not been defined for ' + (styleRow.name || styleLabel) + ' yet.</div>';
-      }
-      return;
-    }
-
-    const intent = document.getElementById('gen-intent')?.value || 'Balanced';
-    const profile = applyIntentToProfile(JSON.parse(JSON.stringify(base)), intent);
-    const gallons = (typeof window.getBatchGallons === 'function') ? window.getBatchGallons() : 5;
-    const og = avg(profile.og);
-    const fg = avg(profile.fg);
-    const hopScaleFactor = gallons / 5;
-
-    const recipe = {
-      style: base.name,
-      styleCode: base.code,
-      intent,
-      batchGallons: roundTo(gallons, 2),
-      efficiency: roundTo(((typeof window.getMashEfficiency === 'function') ? window.getMashEfficiency() : 0.7) * 100, 1),
-      og: roundTo(og, 3),
-      fg: roundTo(fg, 3),
-      ibu: Math.round(avg(profile.ibu)),
-      srm: Math.round(avg(profile.srm)),
-      grains: estimateGrainWeights(profile.grains, og, gallons),
-      hops: profile.hops.map(h => ({
-        ...h,
-        amt: (function(txt){
-          const m = String(txt || '').match(/[\d.]+/);
-          if(!m) return txt;
-          const oz = Math.max(0.1, parseFloat(m[0]) * hopScaleFactor);
-          return String(txt).replace(m[0], oz.toFixed(2));
-        })(h.amt)
-      })),
-      yeast: profile.yeast,
-      why: Array.isArray(base.why) && base.why.length ? base.why : [
-        'Matched directly by the selected style profile.',
-        'Targets and ingredient design were generated from the style-authentic profile.'
-      ]
-    };
-
-    window.lastGeneratedRecipe = recipe;
-    if(typeof renderGenPreview === 'function'){
-      renderGenPreview(recipe);
-      const preview = document.getElementById('gen-preview');
-      if(preview){
-        const note = document.createElement('div');
-        note.className = 'notebox';
-        note.style.marginTop = '10px';
-        note.innerHTML = '<strong>Why this works</strong><div style="margin-top:6px">' + recipe.why.map(x => '• ' + x).join('<br>') + '</div>';
-        preview.appendChild(note);
-      }
-    }
-  };
+  window.generateBJCPRecipe = function(){ return _previousGenerate(); };
 })();
 </script>
 
@@ -9140,83 +8841,7 @@ setTimeout(bindAdvanced, 500);
     return String(amountText).replace(m[0], scaled.toFixed(2));
   }
 
-  window.generateBJCPRecipe = function(){
-    // Always use bjcpGeneratorProfiles as the source of truth
-    // Sync style from main screen first (in case modal opened before sync ran)
-    try{
-      const mainStyle = document.getElementById('beerStyle');
-      const genStyle  = document.getElementById('gen-style');
-      if(mainStyle && genStyle && mainStyle.value){
-        const mainText = (mainStyle.options[mainStyle.selectedIndex]?.text || mainStyle.value || '').trim();
-        const norm = s => String(s||'').toLowerCase().trim();
-        let match = Array.from(genStyle.options).find(o => norm(o.text) === norm(mainText) || norm(o.value) === norm(mainText));
-        if(!match) match = Array.from(genStyle.options).find(o => norm(mainText).includes(norm(o.value)) || norm(o.value).includes(norm(mainText)));
-        if(match) genStyle.value = match.value;
-      }
-    }catch(e){}
-
-    const styleSel = document.getElementById('gen-style');
-    // Use .value which is more reliable than .options[selectedIndex].text with optgroups
-    const styleLabel = styleSel
-      ? String(styleSel.value || styleSel.options?.[styleSel.selectedIndex]?.text || styleSel.options?.[styleSel.selectedIndex]?.value || '').trim()
-      : '';
-
-    console.log('[EzBrewDay] Generator style label:', JSON.stringify(styleLabel));
-    console.log('[EzBrewDay] bjcpGeneratorProfiles keys:', window.bjcpGeneratorProfiles ? Object.keys(window.bjcpGeneratorProfiles).slice(0,5) : 'UNDEFINED');
-
-    // Try bjcpGeneratorProfiles first (our custom profiles)
-    let base = window.bjcpGeneratorProfiles && window.bjcpGeneratorProfiles[styleLabel];
-
-    // Fallback: try case-insensitive name match
-    if(!base && window.bjcpGeneratorProfiles){
-      const lower = styleLabel.toLowerCase().trim();
-      const key = Object.keys(window.bjcpGeneratorProfiles).find(k => k.toLowerCase().trim() === lower);
-      if(key) base = window.bjcpGeneratorProfiles[key];
-    }
-
-    // Fallback: partial match
-    if(!base && window.bjcpGeneratorProfiles){
-      const lower = styleLabel.toLowerCase().trim();
-      const key = Object.keys(window.bjcpGeneratorProfiles).find(k =>
-        lower.includes(k.toLowerCase().trim()) || k.toLowerCase().trim().includes(lower)
-      );
-      if(key) base = window.bjcpGeneratorProfiles[key];
-    }
-
-    console.log('[EzBrewDay] base profile found:', base ? 'YES' : 'NO');
-
-    if(!base){
-      const preview = document.getElementById('gen-preview');
-      if(preview) preview.innerHTML = '<div class="gen-error">No recipe profile found for "' + styleLabel + '".</div>';
-      return;
-    }
-
-    const intent = document.getElementById('gen-intent')?.value || 'Balanced';
-    const profile = (typeof applyIntentToProfile === 'function')
-      ? applyIntentToProfile(JSON.parse(JSON.stringify(base)), intent)
-      : JSON.parse(JSON.stringify(base));
-
-    const gallons = (typeof window.getBatchGallons === 'function') ? window.getBatchGallons() : 5;
-    const og = (typeof avg === 'function') ? avg(profile.og) : (profile.og[0]+profile.og[1])/2;
-    const fg = (typeof avg === 'function') ? avg(profile.fg) : (profile.fg[0]+profile.fg[1])/2;
-
-    const recipe = {
-      style: styleLabel,
-      intent,
-      og: (typeof roundTo === 'function') ? roundTo(og, 3) : Math.round(og*1000)/1000,
-      fg: (typeof roundTo === 'function') ? roundTo(fg, 3) : Math.round(fg*1000)/1000,
-      ibu: Math.round((typeof avg === 'function') ? avg(profile.ibu) : (profile.ibu[0]+profile.ibu[1])/2),
-      srm: Math.round((typeof avg === 'function') ? avg(profile.srm) : (profile.srm[0]+profile.srm[1])/2),
-      grains: (typeof estimateGrainWeights === 'function')
-        ? estimateGrainWeights(profile.grains, og, gallons)
-        : profile.grains,
-      hops: profile.hops,
-      yeast: profile.yeast
-    };
-
-    window.lastGeneratedRecipe = recipe;
-    if(typeof renderGenPreview === 'function') renderGenPreview(recipe);
-};
+  window.generateBJCPRecipe = function(){ /* passthrough — definitive fn is last */ };
 
   function bindGenerateButtonNow(){ /* disabled — button uses onclick attribute directly */ }
   if(document.readyState === 'loading'){
@@ -12111,7 +11736,7 @@ if(_origRefreshProUI){
     if(match) genEl.value = match.value;
   }
 
-  window.generateBJCPRecipe = function(){
+  window._definitiveGenerate = function(){
     try{
       // Step 1: Always sync gen-style to main dropdown first
       const _mainBefore = document.getElementById('beerStyle')?.value;
@@ -12183,7 +11808,11 @@ if(_origRefreshProUI){
       const preview = document.getElementById('gen-preview');
       if(preview) preview.innerHTML = '<div class="gen-error">Generator error: ' + (err.message||err) + '</div>';
     }
-  };
+  }
+
+// Always keep generateBJCPRecipe pointing to the definitive version
+window.generateBJCPRecipe = function(){ return window._definitiveGenerate(); };
+;
 
   // Also sync on open
   const _prevOpen = window.openRecipeGenerator;
