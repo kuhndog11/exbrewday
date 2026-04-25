@@ -7913,15 +7913,17 @@ setTimeout(bindAdvanced, 500);
   }
 
   window.buildBJCPGeneratorLibrary = function(){
-    const lib = {};
+    // Start with our hand-crafted profiles as the base — never overwrite them
+    const existing = window.bjcpGeneratorProfiles || {};
+    const lib = Object.assign({}, existing);
     if(!Array.isArray(window.STYLES_DB)) return lib;
     window.STYLES_DB.forEach(style => {
+      // Only generate a fallback profile if we don't already have one
+      if(lib[style.name]) return;
       const prof = buildProfileFromStyle(style);
       if(!prof) return;
-      const code = stripLeadingZeroCode(style.num || '');
-      const label = style.name;
+      const code = stripLeadingZeroCode(style.styleCode || style.num || '');
       lib[style.name] = prof;
-      lib[label] = prof;
       if(code) lib[code] = prof;
     });
     return lib;
