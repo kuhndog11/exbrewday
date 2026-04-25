@@ -6505,6 +6505,15 @@ function applyGeneratedRecipe(){
         return;
       }
 
+      // Sync style from main screen before lookup
+      const mainStyle = document.getElementById('beerStyle');
+      if(mainStyle && mainStyle.value){
+        const mainText = (mainStyle.options[mainStyle.selectedIndex]?.text || mainStyle.value || '').trim();
+        const norm = s => String(s||'').toLowerCase().trim();
+        const match = Array.from(styleEl.options).find(o => norm(o.text) === norm(mainText) || norm(o.value) === norm(mainText));
+        if(match) styleEl.value = match.value;
+      }
+
       const style = styleEl.value || 'American IPA';
       const intent = intentEl.value || 'Balanced';
 
