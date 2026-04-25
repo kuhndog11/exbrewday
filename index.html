@@ -7509,6 +7509,9 @@ function regenerateVariation(){
 function enhanceGenerate(){
   const original = window.generateBJCPRecipe;
   window.generateBJCPRecipe = function(){
+    // Clear lastGeneratedRecipe BEFORE calling original so adjustRecipe
+    // only runs on the NEW recipe, not the previous style's recipe
+    window.lastGeneratedRecipe = null;
     original();
     if(window.lastGeneratedRecipe){
       adjustRecipe(window.lastGeneratedRecipe);
