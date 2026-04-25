@@ -8922,20 +8922,25 @@ setTimeout(bindAdvanced, 500);
   }
 
   window.generateBJCPRecipe = function(){
+    // Always use bjcpGeneratorProfiles as the source of truth
     const styleSel = document.getElementById('gen-style');
-    const styleLabel = styleSel ? String(styleSel.options?.[styleSel.selectedIndex]?.text || styleSel.value || '').trim() : '';
-    const styleRow = styleRowFromLabel(styleLabel);
+    const styleLabel = styleSel
+      ? String(styleSel.options?.[styleSel.selectedIndex]?.text || styleSel.value || '').trim()
+      : '';
 
-    if(!styleRow){
-      const preview = document.getElementById('gen-preview');
-      if(preview) preview.innerHTML = '<div class="gen-error">I could not match that style to the style library yet.</div>';
-      return;
+    // Try bjcpGeneratorProfiles first (our custom profiles)
+    let base = window.bjcpGeneratorProfiles && window.bjcpGeneratorProfiles[styleLabel];
+
+    // Fallback: try name match
+    if(!base && window.bjcpGeneratorProfiles){
+      const lower = styleLabel.toLowerCase();
+      const key = Object.keys(window.bjcpGeneratorProfiles).find(k => k.toLowerCase() === lower);
+      if(key) base = window.bjcpGeneratorProfiles[key];
     }
 
-    const base = window.authenticProfileForCode(styleRow);
     if(!base){
       const preview = document.getElementById('gen-preview');
-      if(preview) preview.innerHTML = '<div class="gen-error">A profile could not be built for this style.</div>';
+      if(preview) preview.innerHTML = '<div class="gen-error">No recipe profile found for "' + styleLabel + '".</div>';
       return;
     }
 
@@ -8945,46 +8950,26 @@ setTimeout(bindAdvanced, 500);
       : JSON.parse(JSON.stringify(base));
 
     const gallons = (typeof window.getBatchGallons === 'function') ? window.getBatchGallons() : 5;
-    const og = (typeof avg === 'function') ? avg(profile.og) : midpoint(profile.og[0], profile.og[1]);
-    const fg = (typeof avg === 'function') ? avg(profile.fg) : midpoint(profile.fg[0], profile.fg[1]);
-    const hopScaleFactor = gallons / 5;
+    const og = (typeof avg === 'function') ? avg(profile.og) : (profile.og[0]+profile.og[1])/2;
+    const fg = (typeof avg === 'function') ? avg(profile.fg) : (profile.fg[0]+profile.fg[1])/2;
 
     const recipe = {
-      style: base.name,
-      styleCode: base.code,
+      style: styleLabel,
       intent,
-      batchGallons: (typeof roundTo === 'function') ? roundTo(gallons, 2) : gallons,
-      efficiency: (typeof roundTo === 'function')
-        ? roundTo(((typeof window.getMashEfficiency === 'function') ? window.getMashEfficiency() : 0.7) * 100, 1)
-        : 70,
-      og: (typeof roundTo === 'function') ? roundTo(og, 3) : og,
-      fg: (typeof roundTo === 'function') ? roundTo(fg, 3) : fg,
-      ibu: Math.round((typeof avg === 'function') ? avg(profile.ibu) : midpoint(profile.ibu[0], profile.ibu[1])),
-      srm: Math.round((typeof avg === 'function') ? avg(profile.srm) : midpoint(profile.srm[0], profile.srm[1])),
+      og: (typeof roundTo === 'function') ? roundTo(og, 3) : Math.round(og*1000)/1000,
+      fg: (typeof roundTo === 'function') ? roundTo(fg, 3) : Math.round(fg*1000)/1000,
+      ibu: Math.round((typeof avg === 'function') ? avg(profile.ibu) : (profile.ibu[0]+profile.ibu[1])/2),
+      srm: Math.round((typeof avg === 'function') ? avg(profile.srm) : (profile.srm[0]+profile.srm[1])/2),
       grains: (typeof estimateGrainWeights === 'function')
         ? estimateGrainWeights(profile.grains, og, gallons)
         : profile.grains,
-      hops: profile.hops.map(h => ({...h, amt: scaleHopAmountText(h.amt, hopScaleFactor)})),
-      yeast: profile.yeast,
-      why: base.why && base.why.length ? base.why : [
-        'Matched by the selected style profile.',
-        'Generated from a style-authentic ingredient profile.'
-      ]
+      hops: profile.hops,
+      yeast: profile.yeast
     };
 
     window.lastGeneratedRecipe = recipe;
-    if (typeof renderGenPreview === 'function') {
-      renderGenPreview(recipe);
-      const preview = document.getElementById('gen-preview');
-      if(preview){
-        const note = document.createElement('div');
-        note.className = 'notebox';
-        note.style.marginTop = '10px';
-        note.innerHTML = '<strong>Why this works</strong><div style="margin-top:6px">' + recipe.why.map(x => '• ' + x).join('<br>') + '</div>';
-        preview.appendChild(note);
-      }
-    }
-  };
+    if(typeof renderGenPreview === 'function') renderGenPreview(recipe);
+};
 
   function bindGenerateButtonNow(){
     const btn = document.getElementById('gen-recipe-btn');
