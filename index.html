@@ -5823,7 +5823,7 @@ window.addEventListener("load", renderThemeGrid);
     </div>
   </div>
   <div class="gen-actions">
-    <button class="btn btn-primary" id="gen-recipe-btn" type="button">Generate Recipe</button>
+    <button class="btn btn-primary" id="gen-recipe-btn" type="button" onclick="event.stopImmediatePropagation();window.generateBJCPRecipe();">Generate Recipe</button>
   </div>
   <div class="gen-note" id="gen-help-note">The style selected on the main recipe screen will be carried into this popup when a matching style profile exists.</div>
   <div class="gen-preview" 
@@ -6823,17 +6823,7 @@ function applyGeneratedRecipe(){
     }
   };
 
-  function bindGenerateButton(){
-    const btn = document.getElementById('gen-recipe-btn');
-    if(btn && !btn.dataset.bound){
-      btn.dataset.bound = '1';
-      btn.addEventListener('click', function(e){
-        e.preventDefault();
-        if(typeof syncGeneratorStyleFromMain === 'function'){ try{ syncGeneratorStyleFromMain(); }catch(err){} }
-        window.generateBJCPRecipe();
-      });
-    }
-  }
+  function bindGenerateButton(){ /* disabled — button uses onclick attribute directly */ }
 
   if(document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', bindGenerateButton);
@@ -6919,24 +6909,7 @@ function applyGeneratedRecipe(){
 
 <script>
 (function(){
-  function bindGenButton(){
-    const btn = document.getElementById('gen-recipe-btn');
-    if(btn && !btn.dataset.bound2){
-      btn.dataset.bound2 = '1';
-      btn.onclick = function(e){
-        e.preventDefault();
-        if(typeof window.generateBJCPRecipe === 'function'){
-          window.generateBJCPRecipe();
-        }
-      };
-      btn.addEventListener('click', function(e){
-        e.preventDefault();
-        if(typeof window.generateBJCPRecipe === 'function'){
-          window.generateBJCPRecipe();
-        }
-      });
-    }
-  }
+  function bindGenButton(){ /* disabled — button uses onclick attribute directly */ }
 
   function ensureIntentSelect(){
     const styleEl = document.getElementById('gen-style');
@@ -9245,15 +9218,7 @@ setTimeout(bindAdvanced, 500);
     if(typeof renderGenPreview === 'function') renderGenPreview(recipe);
 };
 
-  function bindGenerateButtonNow(){
-    const btn = document.getElementById('gen-recipe-btn');
-    if(btn){
-      btn.onclick = function(e){
-        e.preventDefault();
-        window.generateBJCPRecipe();
-      };
-    }
-  }
+  function bindGenerateButtonNow(){ /* disabled — button uses onclick attribute directly */ }
   if(document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', bindGenerateButtonNow);
   } else {
@@ -12149,13 +12114,19 @@ if(_origRefreshProUI){
   window.generateBJCPRecipe = function(){
     try{
       // Step 1: Always sync gen-style to main dropdown first
+      const _mainBefore = document.getElementById('beerStyle')?.value;
+      const _genBefore  = document.getElementById('gen-style')?.value;
+      console.log('[DEF] CALLED. main='+_mainBefore+' gen='+_genBefore);
       _syncGenStyle();
+      const _genAfter = document.getElementById('gen-style')?.value;
+      console.log('[DEF] After sync. gen='+_genAfter);
 
       const genEl   = document.getElementById('gen-style');
       const intentEl = document.getElementById('gen-intent');
       if(!genEl || !intentEl) return;
 
       const styleLabel = String(genEl.value || genEl.options?.[genEl.selectedIndex]?.text || '').trim();
+      console.log('[DEF] styleLabel='+styleLabel);
       const intent     = String(intentEl.value || 'Balanced').trim();
 
       if(!styleLabel){ console.warn('[EzBrewDay] No style selected'); return; }
