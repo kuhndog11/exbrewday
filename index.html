@@ -12119,7 +12119,108 @@ if(_origRefreshProUI){
       closeCommunityLibrary();
       try{ showTab('brew-notes',document.querySelector('.tab[onclick*="brew-notes"]')); }catch(e){}
     }
-  </script>
+  
+<script>
+// ═══════════════════════════════════════════════════════════
+// DEFINITIVE generateBJCPRecipe — overrides all previous versions
+// Runs last, always wins, reads style fresh from main dropdown
+// ═══════════════════════════════════════════════════════════
+(function(){
+  function _getMainStyle(){
+    const el = document.getElementById('beerStyle');
+    if(!el) return '';
+    return (el.options && el.selectedIndex >= 0)
+      ? String(el.options[el.selectedIndex].text || el.value || '').trim()
+      : String(el.value || '').trim();
+  }
 
-</body>
-</html>
+  function _syncGenStyle(){
+    const genEl = document.getElementById('gen-style');
+    if(!genEl) return;
+    const mainText = _getMainStyle();
+    if(!mainText || mainText === '— Select Style —') return;
+    const norm = s => String(s||'').toLowerCase().trim();
+    const match = Array.from(genEl.options).find(o =>
+      norm(o.text) === norm(mainText) || norm(o.value) === norm(mainText)
+    );
+    if(match) genEl.value = match.value;
+  }
+
+  window.generateBJCPRecipe = function(){
+    try{
+      // Step 1: Always sync gen-style to main dropdown first
+      _syncGenStyle();
+
+      const genEl   = document.getElementById('gen-style');
+      const intentEl = document.getElementById('gen-intent');
+      if(!genEl || !intentEl) return;
+
+      const styleLabel = String(genEl.value || genEl.options?.[genEl.selectedIndex]?.text || '').trim();
+      const intent     = String(intentEl.value || 'Balanced').trim();
+
+      if(!styleLabel){ console.warn('[EzBrewDay] No style selected'); return; }
+
+      // Step 2: Look up profile
+      const profiles = window.bjcpGeneratorProfiles || {};
+      let base = profiles[styleLabel];
+      if(!base){
+        const norm = s => s.toLowerCase().trim();
+        const key  = Object.keys(profiles).find(k => norm(k) === norm(styleLabel));
+        if(key) base = profiles[key];
+      }
+
+      if(!base){
+        const preview = document.getElementById('gen-preview');
+        if(preview) preview.innerHTML = '<div class="gen-error">No recipe profile found for "' + styleLabel + '".</div>';
+        console.warn('[EzBrewDay] No profile for:', styleLabel, '| Available:', Object.keys(profiles).slice(0,5));
+        return;
+      }
+
+      // Step 3: Apply intent modifiers
+      const profile = (typeof window.applyIntentToProfile === 'function')
+        ? window.applyIntentToProfile(JSON.parse(JSON.stringify(base)), intent)
+        : JSON.parse(JSON.stringify(base));
+
+      // Step 4: Build recipe object
+      const gallons = (typeof window.getBatchGallons === 'function') ? window.getBatchGallons() : 5;
+      const avg     = arr => (arr[0] + arr[1]) / 2;
+      const roundTo = (v, n) => Math.round(v * Math.pow(10,n)) / Math.pow(10,n);
+      const og = avg(profile.og);
+      const fg = avg(profile.fg);
+
+      const recipe = {
+        style:       styleLabel,
+        intent:      intent,
+        og:          roundTo(og, 3),
+        fg:          roundTo(fg, 3),
+        ibu:         Math.round(avg(profile.ibu)),
+        srm:         Math.round(avg(profile.srm)),
+        grains:      (typeof window.estimateGrainWeights === 'function')
+                       ? window.estimateGrainWeights(profile.grains, og, gallons)
+                       : profile.grains,
+        hops:        profile.hops,
+        yeast:       profile.yeast,
+        batchGallons: gallons
+      };
+
+      // Step 5: Store and render
+      window.lastGeneratedRecipe = recipe;
+      if(typeof window.renderGenPreview === 'function') window.renderGenPreview(recipe);
+
+    } catch(err){
+      console.error('[EzBrewDay] generateBJCPRecipe error:', err);
+      const preview = document.getElementById('gen-preview');
+      if(preview) preview.innerHTML = '<div class="gen-error">Generator error: ' + (err.message||err) + '</div>';
+    }
+  };
+
+  // Also sync on open
+  const _prevOpen = window.openRecipeGenerator;
+  window.openRecipeGenerator = function(){
+    _syncGenStyle();
+    if(typeof _prevOpen === 'function') return _prevOpen();
+  };
+
+  console.log('[EzBrewDay] Definitive generateBJCPRecipe installed');
+})();
+</script>
