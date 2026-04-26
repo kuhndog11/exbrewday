@@ -1600,6 +1600,7 @@ button[onclick="connectSupabase(true)"]{display:none!important}
     <button id="community-header-btn" class="btn btn-ghost btn-sm" onclick="showCommunityLibrary()">🌍 Community</button>
     <button class="btn btn-ghost btn-sm" onclick="document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));document.getElementById('on-tap')?.classList.add('active');document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));renderTapBoard_init()">🍺 On Tap</button>
     <button class="btn btn-ghost btn-sm" onclick="startBeerCheckout()">🍺 Buy Me a Beer</button>
+    <button class="btn btn-ghost btn-sm" onclick="openFeedbackModal()" id="feedback-toolbar-btn">💬 Feedback</button>
     <button class="btn btn-ghost btn-sm pro-locked-btn" data-pro-feature="json" onclick="triggerJsonImport()">📂 Import JSON</button>
     <input type="file" id="json-import-input" accept=".json,application/json" style="display:none" onchange="handleJsonImport(event)">
     <button class="btn btn-primary btn-sm pro-locked-btn" data-pro-feature="json" onclick="saveData()" title="Download recipe as a JSON file to your computer">💾 Save JSON</button>
@@ -12096,6 +12097,494 @@ if(_origRefreshProUI){
       try{ showTab('brew-notes',document.querySelector('.tab[onclick*="brew-notes"]')); }catch(e){}
     }
   </script>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     EZBREWDAY FEEDBACK SYSTEM
+     - 4 emoji categories (Bug, Idea, Help, Thanks)
+     - Ideas Board with upvoting (Pro only view)
+     - Auto-attach brew data on bug reports
+     - Supabase storage + Resend email
+     ═══════════════════════════════════════════════════════════ -->
+
+<style>
+/* ── Feedback Modal ── */
+#feedback-overlay {
+  display:none; position:fixed; inset:0; z-index:3000;
+  background:rgba(0,0,0,.75); backdrop-filter:blur(4px);
+  align-items:center; justify-content:center; padding:16px;
+}
+#feedback-overlay.show { display:flex; }
+#feedback-modal {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:14px; width:100%; max-width:560px;
+  max-height:92vh; display:flex; flex-direction:column;
+  box-shadow:0 24px 80px rgba(0,0,0,.6); overflow:hidden;
+}
+#feedback-modal-header {
+  padding:16px 20px 0; border-bottom:1px solid var(--border); flex-shrink:0;
+}
+#feedback-modal-header h2 {
+  font-size:15px; font-weight:700; color:var(--text);
+  margin:0 0 12px; display:flex; align-items:center; gap:8px;
+}
+.fb-tabs { display:flex; gap:0; }
+.fb-tab {
+  font-size:12px; font-weight:500; color:var(--text3);
+  padding:8px 14px; cursor:pointer;
+  border-bottom:2px solid transparent; transition:.15s;
+}
+.fb-tab:hover { color:var(--text2); }
+.fb-tab.active { color:var(--teal); border-bottom-color:var(--teal); }
+
+#feedback-modal-body { overflow-y:auto; padding:20px; flex:1; }
+
+/* Category picker */
+.fb-categories {
+  display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;
+}
+.fb-cat {
+  background:var(--bg3); border:2px solid var(--border);
+  border-radius:12px; padding:14px 12px; cursor:pointer;
+  transition:.15s; text-align:center;
+}
+.fb-cat:hover { border-color:var(--teal); background:var(--teal3); }
+.fb-cat.selected { border-color:var(--teal); background:var(--teal3); }
+.fb-cat-emoji { font-size:28px; margin-bottom:6px; }
+.fb-cat-label { font-size:12.5px; font-weight:600; color:var(--text); }
+.fb-cat-desc { font-size:11px; color:var(--text3); margin-top:2px; }
+
+/* Form */
+.fb-form { display:none; }
+.fb-form.active { display:block; }
+.fb-form label {
+  display:block; font-size:11px; font-weight:600;
+  text-transform:uppercase; letter-spacing:.06em;
+  color:var(--text3); margin-bottom:6px;
+}
+.fb-form textarea {
+  width:100%; background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; color:var(--text); font-size:13px;
+  padding:10px 12px; resize:vertical; min-height:100px;
+  font-family:inherit; transition:.15s; box-sizing:border-box;
+}
+.fb-form textarea:focus { outline:none; border-color:var(--teal); }
+.fb-char-count {
+  text-align:right; font-size:11px; color:var(--text3); margin-top:4px;
+}
+.fb-char-count.over { color:#ef4444; }
+.fb-attach-info {
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:10px 12px; margin-top:12px;
+  font-size:11.5px; color:var(--text3);
+  display:flex; align-items:center; gap:8px;
+}
+.fb-status {
+  padding:10px 14px; border-radius:8px; font-size:13px;
+  margin-top:12px; display:none;
+}
+.fb-status.ok { background:rgba(20,184,166,.1); color:var(--teal); border:1px solid rgba(20,184,166,.2); }
+.fb-status.err { background:rgba(239,68,68,.08); color:#f87171; border:1px solid rgba(239,68,68,.2); }
+
+/* Ideas Board */
+#fb-ideas-board { }
+.fb-idea-card {
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:10px; padding:14px 16px; margin-bottom:10px;
+  display:flex; align-items:flex-start; gap:12px;
+}
+.fb-vote-btn {
+  display:flex; flex-direction:column; align-items:center;
+  background:var(--bg4); border:1px solid var(--border);
+  border-radius:8px; padding:6px 10px; cursor:pointer;
+  transition:.15s; flex-shrink:0; min-width:44px;
+}
+.fb-vote-btn:hover { border-color:var(--teal); background:var(--teal3); }
+.fb-vote-btn.voted { border-color:var(--teal); background:var(--teal3); }
+.fb-vote-arrow { font-size:14px; line-height:1; }
+.fb-vote-count { font-size:13px; font-weight:700; color:var(--text); line-height:1; margin-top:2px; }
+.fb-idea-content { flex:1; }
+.fb-idea-text { font-size:13px; color:var(--text); line-height:1.5; margin-bottom:4px; }
+.fb-idea-meta { font-size:11px; color:var(--text3); }
+.fb-ideas-empty {
+  text-align:center; padding:40px 20px; color:var(--text3); font-size:13px;
+}
+.fb-ideas-empty .fb-ideas-emoji { font-size:36px; margin-bottom:10px; }
+.fb-pro-gate {
+  text-align:center; padding:30px 20px;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:12px; margin-top:10px;
+}
+.fb-pro-gate-emoji { font-size:32px; margin-bottom:10px; }
+.fb-loading { text-align:center; color:var(--text3); padding:20px; font-size:13px; }
+
+#feedback-modal-footer {
+  padding:12px 20px; border-top:1px solid var(--border);
+  display:flex; justify-content:space-between; align-items:center; flex-shrink:0;
+}
+</style>
+
+<!-- Feedback Modal -->
+<div id="feedback-overlay" onclick="if(event.target===this)closeFeedbackModal()">
+  <div id="feedback-modal">
+    <div id="feedback-modal-header">
+      <h2>💬 Feedback & Ideas</h2>
+      <div class="fb-tabs">
+        <div class="fb-tab active" id="fbtab-submit" onclick="switchFbTab('submit')">Send Feedback</div>
+        <div class="fb-tab" id="fbtab-ideas" onclick="switchFbTab('ideas')">💡 Ideas Board</div>
+      </div>
+    </div>
+
+    <div id="feedback-modal-body">
+
+      <!-- Submit Panel -->
+      <div id="fb-panel-submit">
+        <!-- Category picker -->
+        <div id="fb-cat-picker">
+          <div style="font-size:12px;color:var(--text3);margin-bottom:12px">What would you like to do?</div>
+          <div class="fb-categories">
+            <div class="fb-cat" id="fbcat-bug" onclick="selectFbCat('bug')">
+              <div class="fb-cat-emoji">🐛</div>
+              <div class="fb-cat-label">Report a Bug</div>
+              <div class="fb-cat-desc">Something isn't working</div>
+            </div>
+            <div class="fb-cat" id="fbcat-idea" onclick="selectFbCat('idea')">
+              <div class="fb-cat-emoji">💡</div>
+              <div class="fb-cat-label">Submit an Idea</div>
+              <div class="fb-cat-desc">Feature you'd love to see</div>
+            </div>
+            <div class="fb-cat" id="fbcat-help" onclick="selectFbCat('help')">
+              <div class="fb-cat-emoji">🙏</div>
+              <div class="fb-cat-label">Get Help</div>
+              <div class="fb-cat-desc">I need some assistance</div>
+            </div>
+            <div class="fb-cat" id="fbcat-thanks" onclick="selectFbCat('thanks')">
+              <div class="fb-cat-emoji">⭐</div>
+              <div class="fb-cat-label">Give Thanks</div>
+              <div class="fb-cat-desc">Share some love</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Message form -->
+        <div class="fb-form" id="fb-form-area">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+            <div id="fb-form-emoji" style="font-size:24px"></div>
+            <div>
+              <div id="fb-form-title" style="font-size:14px;font-weight:700;color:var(--text)"></div>
+              <div id="fb-form-subtitle" style="font-size:11.5px;color:var(--text3)"></div>
+            </div>
+            <button onclick="resetFbForm()" style="margin-left:auto;background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px">← Back</button>
+          </div>
+          <label>Your Message <span style="color:var(--text3);font-weight:400;text-transform:none">(max 500 chars)</span></label>
+          <textarea id="fb-message" placeholder="Describe it here..." maxlength="500" oninput="updateFbCharCount()"></textarea>
+          <div class="fb-char-count"><span id="fb-char-num">0</span>/500</div>
+          <div class="fb-attach-info" id="fb-attach-row" style="display:none">
+            📎 <span>Your current brew session data will be attached to help us debug faster.</span>
+          </div>
+          <div class="fb-status" id="fb-status"></div>
+        </div>
+      </div>
+
+      <!-- Ideas Board Panel -->
+      <div id="fb-panel-ideas" style="display:none">
+        <div id="fb-ideas-board">
+          <div class="fb-loading" id="fb-ideas-loading">Loading ideas...</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div id="feedback-modal-footer">
+      <span style="font-size:11.5px;color:var(--text3)" id="fb-footer-hint">Select a category above</span>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="closeFeedbackModal()">Close</button>
+        <button class="btn btn-primary btn-sm" id="fb-submit-btn" onclick="submitFeedback()" style="display:none">Send 🚀</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// FEEDBACK SYSTEM
+// ═══════════════════════════════════════════════════════════
+(function(){
+  const FEEDBACK_TABLE = 'feedback';
+  let _fbCat = null;
+  let _fbTab = 'submit';
+  let _votedIds = JSON.parse(localStorage.getItem('ezbd_voted_ideas') || '[]');
+
+  // ── Open / Close ──────────────────────────────────────────
+  window.openFeedbackModal = function(){
+    // Must be logged in
+    if(!window.cloudState?.user){
+      alert('Please sign in to your EzBrewDay account to submit feedback.');
+      return;
+    }
+    document.getElementById('feedback-overlay').classList.add('show');
+    resetFbForm();
+    switchFbTab('submit');
+  };
+
+  window.closeFeedbackModal = function(){
+    document.getElementById('feedback-overlay').classList.remove('show');
+  };
+
+  // ── Tabs ──────────────────────────────────────────────────
+  window.switchFbTab = function(tab){
+    _fbTab = tab;
+    document.getElementById('fb-panel-submit').style.display = tab === 'submit' ? '' : 'none';
+    document.getElementById('fb-panel-ideas').style.display  = tab === 'ideas'  ? '' : 'none';
+    document.getElementById('fbtab-submit').classList.toggle('active', tab === 'submit');
+    document.getElementById('fbtab-ideas').classList.toggle('active',  tab === 'ideas');
+    document.getElementById('fb-submit-btn').style.display = tab === 'submit' && _fbCat ? '' : 'none';
+    if(tab === 'ideas') loadIdeasBoard();
+  };
+
+  // ── Category selection ────────────────────────────────────
+  window.selectFbCat = function(cat){
+    _fbCat = cat;
+    // Highlight selected
+    ['bug','idea','help','thanks'].forEach(c => {
+      document.getElementById('fbcat-'+c).classList.toggle('selected', c === cat);
+    });
+
+    const meta = {
+      bug:    { emoji:'🐛', title:'Report a Bug',   sub:'Tell us what went wrong — we'll fix it fast.', attach:true  },
+      idea:   { emoji:'💡', title:'Submit an Idea',  sub:'What feature would make your brew day better?', attach:false },
+      help:   { emoji:'🙏', title:'Get Help',         sub:'Describe what you need — we'll get back to you.', attach:false },
+      thanks: { emoji:'⭐', title:'Give Thanks',      sub:'Made your day? Share the love!',              attach:false },
+    }[cat];
+
+    document.getElementById('fb-form-emoji').textContent    = meta.emoji;
+    document.getElementById('fb-form-title').textContent    = meta.title;
+    document.getElementById('fb-form-subtitle').textContent = meta.sub;
+    document.getElementById('fb-attach-row').style.display  = meta.attach ? '' : 'none';
+    document.getElementById('fb-message').value = '';
+    document.getElementById('fb-char-num').textContent = '0';
+    document.getElementById('fb-status').style.display = 'none';
+    document.getElementById('fb-cat-picker').style.display = 'none';
+    document.getElementById('fb-form-area').classList.add('active');
+    document.getElementById('fb-submit-btn').style.display = '';
+    document.getElementById('fb-footer-hint').textContent = meta.title;
+    document.getElementById('fb-message').focus();
+  };
+
+  window.resetFbForm = function(){
+    _fbCat = null;
+    document.getElementById('fb-cat-picker').style.display = '';
+    document.getElementById('fb-form-area').classList.remove('active');
+    document.getElementById('fb-submit-btn').style.display = 'none';
+    document.getElementById('fb-footer-hint').textContent = 'Select a category above';
+    document.getElementById('fb-status').style.display = 'none';
+    ['bug','idea','help','thanks'].forEach(c =>
+      document.getElementById('fbcat-'+c).classList.remove('selected')
+    );
+  };
+
+  window.updateFbCharCount = function(){
+    const len = document.getElementById('fb-message').value.length;
+    const el  = document.getElementById('fb-char-num');
+    el.textContent = len;
+    el.parentElement.classList.toggle('over', len >= 490);
+  };
+
+  // ── Collect brew session data ─────────────────────────────
+  function collectBrewData(){
+    try {
+      return {
+        style:      document.getElementById('beerStyle')?.value || '',
+        og:         document.getElementById('res-og')?.textContent || '',
+        fg:         document.getElementById('res-fg')?.textContent || '',
+        ibu:        document.getElementById('res-ibu')?.textContent || '',
+        batch:      document.getElementById('bh-batch-vol-gal')?.textContent || '',
+        beerName:   document.getElementById('beerName')?.value || '',
+        browser:    navigator.userAgent.substring(0, 120),
+        screen:     window.innerWidth + 'x' + window.innerHeight,
+        timestamp:  new Date().toISOString(),
+        url:        window.location.href
+      };
+    } catch(e){ return {}; }
+  }
+
+  // ── Submit ────────────────────────────────────────────────
+  window.submitFeedback = async function(){
+    if(!_fbCat) return;
+    if(!window.cloudState?.user){
+      alert('Please sign in to submit feedback.');
+      return;
+    }
+
+    const msg = document.getElementById('fb-message').value.trim();
+    if(!msg){ alert('Please enter a message.'); return; }
+    if(msg.length > 500){ alert('Message must be 500 characters or less.'); return; }
+
+    const btn = document.getElementById('fb-submit-btn');
+    const status = document.getElementById('fb-status');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    status.style.display = 'none';
+
+    try {
+      const payload = {
+        type:       _fbCat,
+        message:    msg,
+        email:      window.cloudState.user.email || '',
+        brew_data:  _fbCat === 'bug' ? collectBrewData() : null,
+        votes:      0,
+        created_at: new Date().toISOString()
+      };
+
+      // Save to Supabase
+      if(window.cloudState?.client){
+        const { error } = await window.cloudState.client
+          .from(FEEDBACK_TABLE)
+          .insert([payload]);
+        if(error) throw error;
+      }
+
+      // Show success
+      const msgs = {
+        bug:    '🐛 Bug reported! We'll investigate and fix it.',
+        idea:   '💡 Idea submitted! Other brewers can now upvote it.',
+        help:   '🙏 Help request sent! We'll reply to your email soon.',
+        thanks: '⭐ Thanks received! You made our day. Cheers! 🍺'
+      };
+      status.textContent = msgs[_fbCat];
+      status.className = 'fb-status ok';
+      status.style.display = 'block';
+      document.getElementById('fb-message').value = '';
+      document.getElementById('fb-char-num').textContent = '0';
+      btn.textContent = 'Sent ✓';
+      setTimeout(() => {
+        resetFbForm();
+        btn.disabled = false;
+        btn.textContent = 'Send 🚀';
+        btn.style.display = 'none';
+      }, 3000);
+
+    } catch(err){
+      console.error('Feedback error:', err);
+      status.textContent = '❌ Something went wrong. Try emailing support@ezbrewday.com directly.';
+      status.className = 'fb-status err';
+      status.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Send 🚀';
+    }
+  };
+
+  // ── Ideas Board ───────────────────────────────────────────
+  async function loadIdeasBoard(){
+    const board = document.getElementById('fb-ideas-board');
+    const isProUser = typeof window.isProUser === 'function' ? window.isProUser() : false;
+
+    if(!isProUser){
+      board.innerHTML = `
+        <div class="fb-pro-gate">
+          <div class="fb-pro-gate-emoji">🔒</div>
+          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">Pro Feature</div>
+          <div style="font-size:13px;color:var(--text3);margin-bottom:14px">The Ideas Board is available to EzBrewDay Pro members. Upgrade to see and vote on community feature requests.</div>
+          <button class="btn btn-primary btn-sm" onclick="showUpgradeModal()">Upgrade to Pro</button>
+        </div>`;
+      return;
+    }
+
+    board.innerHTML = '<div class="fb-loading" id="fb-ideas-loading">Loading ideas...</div>';
+
+    try {
+      if(!window.cloudState?.client) throw new Error('Not connected');
+
+      const { data, error } = await window.cloudState.client
+        .from(FEEDBACK_TABLE)
+        .select('*')
+        .eq('type', 'idea')
+        .order('votes', { ascending: false })
+        .limit(50);
+
+      if(error) throw error;
+
+      if(!data || data.length === 0){
+        board.innerHTML = `
+          <div class="fb-ideas-empty">
+            <div class="fb-ideas-emoji">💡</div>
+            <div style="font-weight:600;color:var(--text);margin-bottom:6px">No ideas yet!</div>
+            <div>Be the first to submit a feature idea.</div>
+          </div>`;
+        return;
+      }
+
+      board.innerHTML = data.map(idea => {
+        const voted   = _votedIds.includes(idea.id);
+        const dateStr = idea.created_at ? new Date(idea.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
+        return `
+          <div class="fb-idea-card" id="idea-card-${idea.id}">
+            <button class="fb-vote-btn ${voted?'voted':''}" onclick="voteIdea('${idea.id}', ${voted})" title="${voted?'Remove vote':'Upvote'}">
+              <div class="fb-vote-arrow">${voted?'▲':'△'}</div>
+              <div class="fb-vote-count" id="vote-count-${idea.id}">${idea.votes || 0}</div>
+            </button>
+            <div class="fb-idea-content">
+              <div class="fb-idea-text">${escapeHtml(idea.message)}</div>
+              <div class="fb-idea-meta">${dateStr}</div>
+            </div>
+          </div>`;
+      }).join('');
+
+    } catch(err){
+      console.error('Ideas load error:', err);
+      board.innerHTML = '<div class="fb-ideas-empty"><div>Could not load ideas. Check your connection.</div></div>';
+    }
+  }
+
+  window.voteIdea = async function(id, alreadyVoted){
+    if(!window.cloudState?.user){
+      alert('Please sign in to vote.');
+      return;
+    }
+
+    const delta      = alreadyVoted ? -1 : 1;
+    const countEl    = document.getElementById('vote-count-'+id);
+    const btn        = countEl?.parentElement;
+    const current    = parseInt(countEl?.textContent || '0');
+    const newCount   = Math.max(0, current + delta);
+
+    // Optimistic update
+    if(countEl) countEl.textContent = newCount;
+    if(btn){
+      btn.classList.toggle('voted', !alreadyVoted);
+      btn.querySelector('.fb-vote-arrow').textContent = alreadyVoted ? '△' : '▲';
+    }
+
+    // Update voted list
+    if(alreadyVoted){
+      _votedIds = _votedIds.filter(v => v !== id);
+    } else {
+      _votedIds.push(id);
+    }
+    localStorage.setItem('ezbd_voted_ideas', JSON.stringify(_votedIds));
+
+    // Update Supabase
+    try {
+      await window.cloudState.client
+        .from(FEEDBACK_TABLE)
+        .update({ votes: newCount })
+        .eq('id', id);
+    } catch(err){
+      console.error('Vote error:', err);
+    }
+  };
+
+  function escapeHtml(str){
+    return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Keyboard close
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape') closeFeedbackModal();
+  });
+
+})();
+</script>
 
 </body>
 </html>
