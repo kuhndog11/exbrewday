@@ -12407,7 +12407,7 @@ if(_origRefreshProUI){
   // ── Submit ────────────────────────────────────────────────
   window.submitFeedback = async function(){
     if(!_fbCat) return;
-    if(!window.cloudState?.user){
+    if(!cloudState?.user){
       const status = document.getElementById('fb-status');
       status.textContent = "🔒 Please sign in to your EzBrewDay account first — click Account Login in the toolbar.";
       status.className = 'fb-status err';
@@ -12429,15 +12429,15 @@ if(_origRefreshProUI){
       const payload = {
         type:       _fbCat,
         message:    msg,
-        email:      window.cloudState.user.email || '',
+        email:      cloudState.user.email || '',
         brew_data:  _fbCat === 'bug' ? collectBrewData() : null,
         votes:      0,
         created_at: new Date().toISOString()
       };
 
       // Save to Supabase
-      if(window.cloudState?.client){
-        const { error } = await window.cloudState.client
+      if(cloudState?.client){
+        const { error } = await cloudState.client
           .from(FEEDBACK_TABLE)
           .insert([payload]);
         if(error) throw error;
@@ -12492,9 +12492,9 @@ if(_origRefreshProUI){
     board.innerHTML = '<div class="fb-loading" id="fb-ideas-loading">Loading ideas...</div>';
 
     try {
-      if(!window.cloudState?.client) throw new Error('Not connected');
+      if(!cloudState?.client) throw new Error('Not connected');
 
-      const { data, error } = await window.cloudState.client
+      const { data, error } = await cloudState.client
         .from(FEEDBACK_TABLE)
         .select('*')
         .eq('type', 'idea')
@@ -12536,7 +12536,7 @@ if(_origRefreshProUI){
   }
 
   window.voteIdea = async function(id, alreadyVoted){
-    if(!window.cloudState?.user){
+    if(!cloudState?.user){
       alert('Please sign in to vote.');
       return;
     }
@@ -12564,7 +12564,7 @@ if(_origRefreshProUI){
 
     // Update Supabase
     try {
-      await window.cloudState.client
+      await cloudState.client
         .from(FEEDBACK_TABLE)
         .update({ votes: newCount })
         .eq('id', id);
