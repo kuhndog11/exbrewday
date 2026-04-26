@@ -17,6 +17,7 @@
   --blue:#60a5fa;--indigo:#818cf8;
   --text:#e2e8f0;--text2:#94a3b8;--text3:#546a8b;
   --green:#34d399;--red:#f87171;--yellow:#fbbf24;
+  --input-bg:var(--bg3);--input-text:var(--text);--input-border:var(--border);
   --mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif;
   --r:8px;
   --fontsize:13.5px;
@@ -2107,6 +2108,31 @@ button[onclick="connectSupabase(true)"]{display:none!important}
           </div>
         </div>
         <div class="sep"></div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">Input / Field Colors</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+          <div>
+            <label class="fl">Field Background</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="color" id="cc-input-bg" value="#1e2637" style="width:38px;height:32px;border:none;border-radius:6px;cursor:pointer;padding:0" oninput="previewCustomColor('cc-input-bg','--input-bg')">
+              <input type="text" id="cc-input-bg-hex" value="#1e2637" placeholder="#1e2637" style="width:90px;font-family:var(--mono);font-size:12px" oninput="syncColorFromHex('cc-input-bg','cc-input-bg-hex')">
+            </div>
+          </div>
+          <div>
+            <label class="fl">Field Text</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="color" id="cc-input-text" value="#e2e8f0" style="width:38px;height:32px;border:none;border-radius:6px;cursor:pointer;padding:0" oninput="previewCustomColor('cc-input-text','--input-text')">
+              <input type="text" id="cc-input-text-hex" value="#e2e8f0" placeholder="#e2e8f0" style="width:90px;font-family:var(--mono);font-size:12px" oninput="syncColorFromHex('cc-input-text','cc-input-text-hex')">
+            </div>
+          </div>
+          <div>
+            <label class="fl">Field Border</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="color" id="cc-input-border" value="#2a3550" style="width:38px;height:32px;border:none;border-radius:6px;cursor:pointer;padding:0" oninput="previewCustomColor('cc-input-border','--input-border')">
+              <input type="text" id="cc-input-border-hex" value="#2a3550" placeholder="#2a3550" style="width:90px;font-family:var(--mono);font-size:12px" oninput="syncColorFromHex('cc-input-border','cc-input-border-hex')">
+            </div>
+          </div>
+        </div>
+        <div class="sep"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
           <div>
             <label class="fl">UI Font (body &amp; labels)</label>
@@ -3954,15 +3980,18 @@ function hexToRgba(hex, alpha){
 
 // The COLOR_MAP: maps element id -> CSS variable name
 const COLOR_MAP = [
-  ['cc-bg',     '--bg'],
-  ['cc-bg2',    '--bg2'],
-  ['cc-teal',   '--teal'],
-  ['cc-text',   '--text'],
-  ['cc-text2',  '--text2'],
-  ['cc-border', '--border'],
-  ['cc-green',  '--green'],
-  ['cc-yellow', '--yellow'],
-  ['cc-red',    '--red'],
+  ['cc-bg',           '--bg'],
+  ['cc-bg2',          '--bg2'],
+  ['cc-teal',         '--teal'],
+  ['cc-text',         '--text'],
+  ['cc-text2',        '--text2'],
+  ['cc-border',       '--border'],
+  ['cc-green',        '--green'],
+  ['cc-yellow',       '--yellow'],
+  ['cc-red',          '--red'],
+  ['cc-input-bg',     '--input-bg'],
+  ['cc-input-text',   '--input-text'],
+  ['cc-input-border', '--input-border'],
 ];
 
 // Apply only the SAVED custom colors (reads from localStorage, not pickers)
