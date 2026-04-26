@@ -2321,7 +2321,7 @@ button[onclick="connectSupabase(true)"]{display:none!important}
       </div>
       <div class="inline-actions" style="margin-top:12px">
         <button class="btn btn-primary btn-sm" type="button" onclick="saveCurrentEquipmentProfile()">💾 Save Current as Custom</button>
-        <button class="btn btn-primary btn-sm pro-locked-btn" data-pro-feature="cloud" type="button" onclick="cloudSaveCurrentEquipmentProfile()">☁️ Save Current to Cloud</button>
+        <button class="btn btn-primary btn-sm pro-locked-btn" data-pro-feature="cloud" data-original-onclick="cloudSaveCurrentEquipmentProfile()" type="button" onclick="cloudSaveCurrentEquipmentProfile()">☁️ Save Current to Cloud</button>
         <button class="btn btn-ghost btn-sm" type="button" onclick="loadSelectedEquipmentProfile()">↺ Re-Apply Selected Profile</button>
       </div>
       <div class="note-sm">Custom profiles are stored locally in this browser. Cloud equipment profile sync is available with Brewday Pro.</div>
