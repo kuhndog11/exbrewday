@@ -104,7 +104,7 @@ exports.handler = async function(event, context) {
       },
       body: JSON.stringify({
         from: 'EzBrewDay Feedback <brett@ezbrewday.com>',
-        to: ['support@ezbrewday.com'],
+        to: ['support@ezbrewday.com', 'kuhndog11@gmail.com'],
         reply_to: email || 'support@ezbrewday.com',
         subject: `${info.emoji} [${info.label}] ${message.substring(0, 60)}${message.length > 60 ? '...' : ''}`,
         html: htmlBody
