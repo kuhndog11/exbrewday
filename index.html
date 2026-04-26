@@ -8123,20 +8123,20 @@ setTimeout(bindAdvanced, 500);
   }
 
   window.buildBJCPGeneratorLibrary = function(){
-    const lib = {};
+    // Start with our hand-crafted profiles — never overwrite them
+    const lib = Object.assign({}, window.bjcpGeneratorProfiles || {});
     if(!Array.isArray(window.STYLES_DB)) return lib;
     window.STYLES_DB.forEach(style => {
+      // Only use fallback for styles we haven't hand-crafted
+      if(lib[style.name]) return;
       const prof = buildProfileFromStyle(style);
       if(!prof) return;
-      const code = stripLeadingZeroCode(style.num || '');
-      const label = style.name;
       lib[style.name] = prof;
-      lib[label] = prof;
-      if(code) lib[code] = prof;
     });
     return lib;
   };
 
+  // Don't overwrite — just merge fallbacks in
   window.bjcpGeneratorProfiles = window.buildBJCPGeneratorLibrary();
 
   function getGeneratorSelectedLabel(){
@@ -8151,8 +8151,19 @@ setTimeout(bindAdvanced, 500);
   window.generateBJCPRecipe = function(){
     const intent = document.getElementById('gen-intent')?.value || 'Balanced';
     const styleLabel = getGeneratorSelectedLabel() || getMainStyleLabel();
-    const styleRow = getStyleDbRow(styleLabel);
-    const base = styleRow ? buildProfileFromStyle(styleRow) : null;
+
+    // Use hand-crafted profile first, fall back to buildProfileFromStyle
+    const profiles = window.bjcpGeneratorProfiles || {};
+    const norm = s => String(s||'').toLowerCase().trim();
+    let base = profiles[styleLabel];
+    if(!base){
+      const key = Object.keys(profiles).find(k => norm(k) === norm(styleLabel));
+      if(key) base = profiles[key];
+    }
+    if(!base){
+      const styleRow = getStyleDbRow(styleLabel);
+      base = styleRow ? buildProfileFromStyle(styleRow) : null;
+    }
 
     if(!base){
       const preview = document.getElementById('gen-preview');
@@ -8202,17 +8213,8 @@ setTimeout(bindAdvanced, 500);
     }
   };
 
-  // Rebuild generator library after page load, then sync dropdown options from main style list.
-  function refreshBJCPGeneratorLibrary(){
-    window.bjcpGeneratorProfiles = window.buildBJCPGeneratorLibrary();
-  }
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', refreshBJCPGeneratorLibrary);
-  } else {
-    refreshBJCPGeneratorLibrary();
-  }
-  setTimeout(refreshBJCPGeneratorLibrary, 300);
-  setTimeout(refreshBJCPGeneratorLibrary, 1200);
+  // refreshBJCPGeneratorLibrary — no-op, profiles set directly
+  function refreshBJCPGeneratorLibrary(){ }
 })();
 </script>
 
