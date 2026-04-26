@@ -12347,9 +12347,9 @@ if(_origRefreshProUI){
     });
 
     const meta = {
-      bug:    { emoji:'🐛', title:'Report a Bug',   sub:'Tell us what went wrong — we'll fix it fast.', attach:true  },
+      bug:    { emoji:'🐛', title:'Report a Bug',   sub:"Tell us what went wrong — we'll fix it fast.", attach:true  },
       idea:   { emoji:'💡', title:'Submit an Idea',  sub:'What feature would make your brew day better?', attach:false },
-      help:   { emoji:'🙏', title:'Get Help',         sub:'Describe what you need — we'll get back to you.', attach:false },
+      help:   { emoji:'🙏', title:'Get Help',         sub:"Describe what you need — we'll get back to you.", attach:false },
       thanks: { emoji:'⭐', title:'Give Thanks',      sub:'Made your day? Share the love!',              attach:false },
     }[cat];
 
@@ -12409,7 +12409,7 @@ if(_origRefreshProUI){
     if(!_fbCat) return;
     if(!window.cloudState?.user){
       const status = document.getElementById('fb-status');
-      status.textContent = '🔒 Please sign in to your EzBrewDay account first — click Account Login in the toolbar.';
+      status.textContent = "🔒 Please sign in to your EzBrewDay account first — click Account Login in the toolbar.";
       status.className = 'fb-status err';
       status.style.display = 'block';
       return;
@@ -12445,10 +12445,10 @@ if(_origRefreshProUI){
 
       // Show success
       const msgs = {
-        bug:    '🐛 Bug reported! We'll investigate and fix it.',
-        idea:   '💡 Idea submitted! Other brewers can now upvote it.',
-        help:   '🙏 Help request sent! We'll reply to your email soon.',
-        thanks: '⭐ Thanks received! You made our day. Cheers! 🍺'
+        bug:    "🐛 Bug reported! We'll investigate and fix it.",
+        idea:   "💡 Idea submitted! Other brewers can now upvote it.",
+        help:   "🙏 Help request sent! We'll reply to your email soon.",
+        thanks: "⭐ Thanks received! You made our day. Cheers! 🍺"
       };
       status.textContent = msgs[_fbCat];
       status.className = 'fb-status ok';
@@ -12465,7 +12465,7 @@ if(_origRefreshProUI){
 
     } catch(err){
       console.error('Feedback error:', err);
-      status.textContent = '❌ Something went wrong. Try emailing support@ezbrewday.com directly.';
+      status.textContent = "❌ Something went wrong. Try emailing support@ezbrewday.com directly.";
       status.className = 'fb-status err';
       status.style.display = 'block';
       btn.disabled = false;
