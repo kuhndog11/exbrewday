@@ -3856,8 +3856,7 @@ async function submitPasswordSetup(){
                   </div>
                 </div>
                 <div style="display:flex;gap:8px">
-                  <button class="btn btn-ghost btn-sm" onclick="saveTapCustomColors();tapLivePreview()">💾 Save Colors</button>
-                  <button class="btn btn-ghost btn-sm" onclick="resetTapCustomColors();tapLivePreview()">↺ Reset</button>
+                  <span style="font-size:11px;color:var(--text3)">Colors save automatically with Save Settings</span>
                 </div>
               </div>
             </div>
@@ -4352,7 +4351,12 @@ function applyTapCustomColors(vals){
     if(saved && /^#[0-9a-fA-F]{6}$/.test(saved)) root.style.setProperty(cssVar, saved);
   });
   if(typeof tapState!=='undefined') tapState.customColors = v;
-  if(v['tcc-font']){ loadGoogleFont(v['tcc-font']); document.documentElement.style.setProperty('--sans', v['tcc-font']); }
+  if(v['tcc-font']){ loadGoogleFont(v['tcc-font']); 
+    // Apply font only to tap board, not the whole app
+    const tapEl = document.getElementById('tap-board-root') || document.querySelector('.tap-board-wrap');
+    if(tapEl) tapEl.style.fontFamily = v['tcc-font'];
+    else document.documentElement.style.setProperty('--tap-font', v['tcc-font']);
+  }
 }
 
 function resetTapCustomColors(){
@@ -9554,6 +9558,8 @@ function tapSaveSettings(){
   renderTapBoard();
   document.getElementById('tap-setup-panel').style.display='none';
   tapSetStatus('Settings saved.','ok');
+  // Cloud sync for Pro users
+  cloudSyncPushSettings().catch(()=>{});
 }
 
 function tapCopyUrl(){
@@ -9920,6 +9926,8 @@ async function tapSaveAll(){
   }
   tapState.dirty=false;
   tapSetStatus('☁ Tap board saved','ok');
+  // Also sync settings to user_settings table
+  cloudSyncPushSettings().catch(()=>{});
 }
 
 async function tapLoadFromCloud(){
@@ -12729,10 +12737,15 @@ document.addEventListener('keydown', function(e){
   window.cloudSyncPushSettings = async function(){
     if(!isProUser() || !cloudState?.client || !cloudState?.user) return;
     try {
+      const tapSettings = (()=>{ 
+        try{ return JSON.parse(localStorage.getItem('ezbd_tap_settings')||localStorage.getItem('srbc_tap_settings_v1')||'{}'); }
+        catch(e){ return {}; } 
+      })();
       const payload = {
-        colors:  getCustomColors(),
-        brand:   getBrandSettings(),
-        tap:     getTapCustomColors(),
+        colors:      getCustomColors(),
+        brand:       getBrandSettings(),
+        tap:         getTapCustomColors(),
+        tapSettings: tapSettings,
       };
       await cloudState.client.from(SETTINGS_TABLE).upsert({
         user_id:    cloudState.user.id,
@@ -12771,6 +12784,11 @@ document.addEventListener('keydown', function(e){
       // Apply tap colors
       if(p.tap && Object.keys(p.tap).length){
         setTapCustomColors(p.tap);
+        applyTapCustomColors(p.tap);
+      }
+      // Apply tap settings
+      if(p.tapSettings && Object.keys(p.tapSettings).length){
+        if(typeof tapSaveSettingsLocal === 'function') tapSaveSettingsLocal(p.tapSettings);
       }
 
       console.log('[CloudSync] Settings restored from cloud');
