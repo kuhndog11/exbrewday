@@ -381,9 +381,9 @@ linear-gradient(90deg,transparent 0 28%,rgba(20,184,166,.22) 28% 34%,transparent
 /* ── More menu dropdown ── */
 .hdr-more-wrap{position:relative;display:none}
 .hdr-more-dropdown{
-  display:none;position:absolute;top:calc(100% + 6px);right:0;
+  display:none;position:fixed;top:56px;right:8px;
   background:var(--bg2);border:1px solid var(--border);border-radius:10px;
-  padding:6px;min-width:180px;z-index:2000;
+  padding:6px;min-width:180px;z-index:9999;
   box-shadow:0 8px 32px rgba(0,0,0,.4);
 }
 .hdr-more-dropdown.open{display:block}
