@@ -4665,8 +4665,8 @@ function safeVal(id){return document.getElementById(id)?.value ?? null}
 function safeText(id){return document.getElementById(id)?.textContent ?? null}
 function getActivePaneId(){return document.querySelector('.pane.active')?.id||'brew-notes'}
 function getAllControlSnapshot(){
-  const skipPrefixes=['cloud-','license-','sb-','wf-float-','auth-signed-in-'];
-  const skipIds=new Set(['json-import-input']);
+  const skipPrefixes=['cloud-','license-','sb-','wf-float-','auth-signed-in-','cc-','tcc-','lw-','lsw-','lg-','lh-','ly-'];
+  const skipIds=new Set(['json-import-input','themePreset','cc-font-sans','cc-font-mono','cc-radius','cc-font-size']);
   return Array.from(document.querySelectorAll('input[id], select[id], textarea[id]'))
     .filter(el=>!skipIds.has(el.id) && !skipPrefixes.some(p=>el.id.startsWith(p)))
     .reduce((acc,el)=>{
@@ -4753,7 +4753,12 @@ function applyCloudPayload(p){
     trigger(el);
   };
   if(p.controls&&typeof p.controls==='object'){
+    // Skip color pickers, theme, and settings controls — these are user-specific
+    const skipOnImport = new Set(['themePreset','cc-font-sans','cc-font-mono','cc-radius','cc-font-size']);
+    const skipOnImportPrefix = ['cc-','tcc-','lw-','lsw-','lg-','lh-','ly-'];
     Object.entries(p.controls).forEach(([id,snap])=>{
+      if(skipOnImport.has(id)) return;
+      if(skipOnImportPrefix.some(pfx=>id.startsWith(pfx))) return;
       if(snap&&Object.prototype.hasOwnProperty.call(snap,'value')) set(id,snap.value);
     });
   }else{
