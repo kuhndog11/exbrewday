@@ -4823,7 +4823,15 @@ function applyCloudPayload(p){
   updateCloudStatus('Cloud recipe loaded into the current session.','ok');
 }
 async function ensureCloudReady(){
-  if(!await connectSupabase(false)){
+  // If we already have a connected user and client, skip re-connecting
+  if(cloudState?.user && cloudState?.client) return true;
+  // Otherwise try to connect with a timeout
+  const connectPromise = connectSupabase(false);
+  const timeoutPromise = new Promise(r => setTimeout(() => r(false), 3000));
+  const connected = await Promise.race([connectPromise, timeoutPromise]);
+  if(!connected){
+    // Last resort — check if client exists even without fresh auth
+    if(cloudState?.client && cloudState?.user) return true;
     showCloudModal();
     updateCloudStatus('Could not connect your account. Please sign in again.','bad');
     return false;
