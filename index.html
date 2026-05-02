@@ -4844,13 +4844,16 @@ async function cloudSaveCurrentRecipe(){
 
   const payload=collectCloudPayload();
   const proposedName=(payload.beerName||'Untitled Recipe').trim();
-  // Use inline name input instead of prompt() (blocked when modal has aria-hidden)
+  // Close cloud modal first so dialog appears on top
+  closeCloudModal();
+  await new Promise(r=>setTimeout(r,100));
+  // Use inline name input instead of prompt()
   const name = await new Promise(resolve => {
     const existing = document.getElementById('cloud-save-name-wrap');
     if(existing) existing.remove();
     const wrap = document.createElement('div');
     wrap.id = 'cloud-save-name-wrap';
-    wrap.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px';
+    wrap.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:20px';
     wrap.innerHTML = `
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;width:100%;max-width:400px;box-shadow:0 16px 48px rgba(0,0,0,.5)">
         <div style="font-weight:700;font-size:15px;margin-bottom:12px;color:var(--text)">💾 Save Recipe to Cloud</div>
@@ -4887,10 +4890,9 @@ async function cloudSaveCurrentRecipe(){
   }
 
   updateCloudStatus('Cloud recipe saved: '+name,'ok');
-  document.getElementById('cloud-overlay')?.classList.add('show');
+  showCloudModal();
   await refreshCloudRecipes();
   refreshCloudModalAccess();
-  try{ alert('Cloud recipe saved: '+name); }catch(e){}
 }
 
 async function cloudSaveCurrentEquipmentProfile(){
@@ -4901,12 +4903,14 @@ async function cloudSaveCurrentEquipmentProfile(){
   if(!await ensureCloudReady()) return;
 
   const proposed=((document.getElementById('bh-method')?.value || document.getElementById('brewMethod')?.value || 'Custom Equipment')+'').trim() || 'Custom Equipment';
+  closeCloudModal();
+  await new Promise(r=>setTimeout(r,100));
   const name = await new Promise(resolve => {
     const existing = document.getElementById('cloud-save-name-wrap');
     if(existing) existing.remove();
     const wrap = document.createElement('div');
     wrap.id = 'cloud-save-name-wrap';
-    wrap.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px';
+    wrap.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:20px';
     wrap.innerHTML = `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;width:100%;max-width:400px;box-shadow:0 16px 48px rgba(0,0,0,.5)"><div style="font-weight:700;font-size:15px;margin-bottom:12px;color:var(--text)">💾 Save Equipment Profile to Cloud</div><input id="cloud-save-name-input" type="text" value="${proposed}" placeholder="Profile name" style="width:100%;margin-bottom:16px"><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('cloud-save-name-wrap').remove();window._cloudSaveResolve(null)">Cancel</button><button class="btn btn-primary btn-sm" onclick="const v=document.getElementById('cloud-save-name-input').value.trim();document.getElementById('cloud-save-name-wrap').remove();window._cloudSaveResolve(v||'${proposed}')">Save</button></div></div>`;
     window._cloudSaveResolve = resolve;
     document.body.appendChild(wrap);
@@ -7095,7 +7099,23 @@ function applyGeneratedRecipe(){
   };
 
   if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', function(){
+    document.addEventListener('visibilitychange', async function(){
+  if(document.visibilityState === 'visible' && typeof cloudState !== 'undefined'){
+    // Re-verify session when user returns to tab (fixes tracking prevention drops)
+    if(cloudState?.client && !cloudState?.user){
+      try{
+        const {data:{session}} = await cloudState.client.auth.getSession();
+        if(session?.user){
+          cloudState.user = session.user;
+          if(typeof refreshCloudModalAccess === 'function') refreshCloudModalAccess();
+          if(typeof refreshProUI === 'function') refreshProUI();
+        }
+      }catch(e){}
+    }
+  }
+});
+
+document.addEventListener('DOMContentLoaded', function(){
       ensureIntentSelect();
       bindGenButton();
     });
