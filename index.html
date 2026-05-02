@@ -4896,30 +4896,40 @@ async function cloudSaveCurrentRecipe(){
   const name = await showInlinePrompt('💾 Save Recipe to Cloud', proposedName);
   if(!name){
     updateCloudStatus('Cloud save cancelled.','');
-    return;
-  }
-
-  const row={
-    user_id:cloudState.user.id,
-    name,
-    payload,
-    updated_at:new Date().toISOString()
-  };
-
-  const {error}=await cloudState.client
-    .from(CLOUD_TABLE)
-    .upsert(row,{onConflict:'user_id,name'});
-
-  if(error){
-    updateCloudStatus('Cloud save failed: '+error.message,'bad');
     showCloudModal();
     return;
   }
 
-  updateCloudStatus('Cloud recipe saved: '+name,'ok');
-  showCloudModal();
-  await refreshCloudRecipes();
-  refreshCloudModalAccess();
+  updateCloudStatus('Saving...','');
+
+  try {
+    const row={
+      user_id:cloudState.user.id,
+      name,
+      payload,
+      updated_at:new Date().toISOString()
+    };
+
+    const {error}=await cloudState.client
+      .from(CLOUD_TABLE)
+      .upsert(row,{onConflict:'user_id,name'});
+
+    if(error){
+      console.error('Cloud save error:', error);
+      showCloudModal();
+      updateCloudStatus('Cloud save failed: '+error.message,'bad');
+      return;
+    }
+
+    updateCloudStatus('Cloud recipe saved: '+name,'ok');
+    showCloudModal();
+    await refreshCloudRecipes();
+    refreshCloudModalAccess();
+  } catch(e) {
+    console.error('Cloud save exception:', e);
+    showCloudModal();
+    updateCloudStatus('Cloud save error: '+e.message,'bad');
+  }
 }
 
 async function cloudSaveCurrentEquipmentProfile(){
