@@ -476,6 +476,38 @@ button[onclick="connectSupabase(true)"]{display:none!important}
   50%{border-color:rgba(248,113,113,1);box-shadow:0 0 22px rgba(248,113,113,.45)}
   100%{border-color:rgba(248,113,113,.35);box-shadow:0 0 0 rgba(248,113,113,0)}
 }
+
+/* ── Hop Schedule Card ─────────────────────────────── */
+#wf-hop-schedule-card{display:none;margin-bottom:16px}
+#wf-hop-schedule-card.visible{display:block}
+.wf-hop-list{display:flex;flex-direction:column;gap:6px;padding:4px 0}
+.wf-hop-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg3);transition:all .2s}
+.wf-hop-item.done{opacity:.45;text-decoration:line-through}
+.wf-hop-item.next-up{border-color:var(--teal);background:rgba(20,184,166,.08);box-shadow:0 0 0 1px var(--teal)}
+.wf-hop-item.warning{border-color:var(--yellow,#f59e0b);background:rgba(245,158,11,.1);animation:hop-warn-pulse 1.2s ease-in-out infinite}
+@keyframes hop-warn-pulse{0%,100%{box-shadow:0 0 0 1px rgba(245,158,11,.4)}50%{box-shadow:0 0 6px 2px rgba(245,158,11,.5)}}
+.wf-hop-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;background:var(--teal)}
+.wf-hop-item.done .wf-hop-dot{background:var(--text3)}
+.wf-hop-item.warning .wf-hop-dot{background:var(--yellow,#f59e0b)}
+.wf-hop-name{flex:1;font-size:12px;font-weight:600;color:var(--text)}
+.wf-hop-sched{font-size:11px;color:var(--text3);font-family:var(--mono)}
+.wf-hop-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;background:rgba(20,184,166,.15);color:var(--teal);border:1px solid rgba(20,184,166,.25)}
+.wf-hop-item.done .wf-hop-badge{background:var(--bg2);color:var(--text3);border-color:var(--border)}
+.wf-hop-item.warning .wf-hop-badge{background:rgba(245,158,11,.15);color:var(--yellow,#f59e0b);border-color:rgba(245,158,11,.3)}
+.wf-hop-check{font-size:13px;color:var(--text3);cursor:pointer;flex-shrink:0;padding:2px 4px;border-radius:4px;transition:color .15s}
+.wf-hop-check:hover{color:var(--teal)}
+.wf-hop-item.done .wf-hop-check{color:var(--teal)}
+
+/* ── Countdown badge on workflow steps ─────────────── */
+.wf-step-countdown{font-size:10px;font-weight:700;color:var(--teal);font-family:var(--mono);background:rgba(20,184,166,.1);border:1px solid rgba(20,184,166,.2);border-radius:10px;padding:1px 6px;margin-left:6px;white-space:nowrap}
+.wf-step-countdown.warn{color:var(--yellow,#f59e0b);background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.25);animation:hop-warn-pulse 1.2s ease-in-out infinite}
+.wf-row.next-hop{border-color:var(--teal)!important;background:rgba(20,184,166,.05)!important}
+
+/* ── Floating timer hop line ───────────────────────── */
+.wf-float-hop{font-size:10.5px;color:var(--teal);padding:4px 0 0;border-top:1px solid rgba(255,255,255,.07);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wf-float-hop.warn{color:var(--yellow,#f59e0b);font-weight:700;animation:hop-warn-pulse 1.2s ease-in-out infinite}
+.wf-float-hop:empty{display:none}
+
 .wf-float.alarm-flash{
   animation:wfFloatAlarmFlash 1s infinite;
 }
@@ -2369,6 +2401,14 @@ button[onclick="connectSupabase(true)"]{display:none!important}
         </div>
       </div>
 
+      <!-- Hop Schedule Card — shown during boil -->
+      <div class="card" id="wf-hop-schedule-card">
+        <div class="card-hd"><span class="card-title">🍺 Boil Hop Schedule</span><span class="helper" style="margin:0;font-size:10.5px">Updates live · click ✓ to mark done</span></div>
+        <div class="card-body">
+          <div class="wf-hop-list" id="wf-hop-schedule-list"></div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-hd"><span class="card-title">Workflow Steps</span></div>
         <div class="card-body">
@@ -2695,6 +2735,7 @@ button[onclick="connectSupabase(true)"]{display:none!important}
       </div>
       <div class="wf-progress" style="margin-top:0"><span id="wf-float-progress"></span></div>
       <div class="wf-float-sub" id="wf-float-sub">Press Start to begin the timer.</div>
+      <div class="wf-float-hop" id="wf-float-hop"></div>
     </div>
     <div class="wf-float-actions">
       <button class="btn btn-primary btn-sm" id="wf-float-start" onclick="handleFloatPrimaryAction()">▶ Start</button>
@@ -3134,7 +3175,7 @@ function enableWorkflowFloatDrag(){
   window.addEventListener('resize',()=>{clampPosition();persist()});
 }
 
-let workflowSteps=[],workflowState={index:0,remaining:0,running:!1,timer:null,stepDuration:0,lastBuiltAt:null,alarmActive:!1,alarmTimer:null,audioCtx:null,stepStartWallTime:null,stepActualLog:{}};function parseTimeToMinutes(e){if(!e)return 0;const t=String(e).match(/(\d+)\s*min/i);return t?parseInt(t[1],10):0}function formatClock(e){const t=Math.max(0,Math.round(e||0));return`${String(Math.floor(t/60)).padStart(2,"0")}:${String(t%60).padStart(2,"0")}`}function inferChillTargetTemp(){const e=val("wf-chill-temp");if(e>0)return e;const t=document.getElementById("yi-temp")?.textContent||"",a=t.match(/(\d+)\s*-\s*(\d+)/);if(a)return parseInt(a[1],10);const n=t.match(/(\d+)/);return n?parseInt(n[1],10):68}function collectHopEvents(){val("bh-boil-time");const e=[];return document.querySelectorAll('[id^="hop-row-"]').forEach(t=>{const a=t.id.replace("hop-row-",""),n=sel(`h-name-${a}`)||"Hop Addition",o=val(`h-oz-${a}`)||0,l=sel(`h-sched-${a}`)||"",i=document.getElementById(`h-notes-${a}`)?.value||"";if(o<=0)return;const s=l.toLowerCase();if(s.includes("dry"))return void e.push({key:`dry-${a}`,label:`Dry hop — ${n}`,remain:-999,type:"post",desc:`Add ${f2(o)} oz ${n} during dry hop. ${i}`.trim()});if(s.includes("whirlpool"))return void e.push({key:`wp-${a}`,label:`Whirlpool hop — ${n}`,remain:0,type:"whirlpool",desc:`Add ${f2(o)} oz ${n} at whirlpool. ${i}`.trim()});if(s.includes("flameout")||s.startsWith("0 min"))return void e.push({key:`fo-${a}`,label:`Flameout hop — ${n}`,remain:0,type:"flameout",desc:`Add ${f2(o)} oz ${n} at flameout. ${i}`.trim()});const r=parseSchedule(l);e.push({key:`boil-${a}`,label:`Add ${n}`,remain:r,type:"boil",desc:`Add ${f2(o)} oz ${n} with ${r} min left in the boil. ${i}`.trim()})}),e.sort((e,t)=>"post"===e.type?1:"post"===t.type?-1:(t.remain||0)-(e.remain||0))}function buildWorkflow(){const e=document.getElementById("wf-chill-temp");e&&(!e.value||+e.value<=0)&&(e.value=inferChillTargetTemp());const t=[];let a=1;const n=document.getElementById("res-strike-vol")?.textContent||"—",o=document.getElementById("res-strike-temp")?.textContent||"—",l=val("bh-mash-time")||0;t.push({n:a++,name:"Heat strike water",duration:0,detail:`Heat strike water to ${o} for ${n}. Manual hold step.`}),l>0&&t.push({n:a++,name:"Mash in / dough in",duration:60*l,detail:"Mash in, eliminate dough balls, verify target mash temp, and stabilize the bed."});const i=sel("mashProfile"),s=MASH_PROFILES.find(e=>e.name===i);s&&s.steps?.length&&s.steps.forEach((e,n)=>{let o=e.temp||"";0===n&&val("mashTemp")>0&&(o=`${val("mashTemp")}°F`);const l=parseTimeToMinutes(e.time);t.push({n:a++,name:e.name,duration:60*l,detail:`Hold at ${o||"target temp"} for ${e.time}. ${e.desc||""}`.trim()})});const r=val("wf-sparge-min")||0;t.push({n:a++,name:"Recirculate / vorlauf",duration:0,detail:"Manual check step: clear wort and confirm run-off before sparging."}),r>0&&t.push({n:a++,name:"Sparge",duration:60*r,detail:"Sparge to hit pre-boil volume and gravity targets."}),t.push({n:a++,name:"Bring wort to boil",duration:0,detail:"Manual hold step: watch for hot break and confirm steady boil before starting boil timer."});const c=val("bh-boil-time")||60,d=[...collectHopEvents().filter(e=>"post"!==e.type).map(e=>({remain:e.remain,label:e.label,desc:e.desc,type:e.type})),{remain:0,label:"Boil complete",desc:"Turn off heat and move to flameout / whirlpool steps.",type:"complete"}];d.sort((e,t)=>(t.remain||0)-(e.remain||0));let m=c;d.some(e=>e.remain===c)||t.push({n:a++,name:"Start boil",duration:0,detail:`Start ${c}-minute boil timer.`}),d.forEach(e=>{const n=m-(e.remain||0);if(n>0&&t.push({n:a++,name:`Boil countdown — ${m} to ${e.remain} min`,duration:60*n,detail:`Boil until ${e.remain} min remain.`}),"boil"===e.type&&t.push({n:a++,name:e.label,duration:0,detail:e.desc}),"flameout"===e.type&&t.push({n:a++,name:e.label,duration:0,detail:e.desc}),"whirlpool"===e.type){const n=val("wf-whirlpool-min")||0;t.push({n:a++,name:e.label,duration:0,detail:e.desc}),n>0&&t.push({n:a++,name:"Whirlpool hold",duration:60*n,detail:`Maintain whirlpool for ${n} min before chilling.`})}m=e.remain||0});const g=val("wf-chill-temp")||68;t.push({n:a++,name:"Chill wort",duration:0,detail:`Cool wort to ${g}°F and transfer to fermenter. Manual hold step.`});const u=collectHopEvents().filter(e=>"post"===e.type);if(u.length&&t.push({n:a++,name:"Dry hop reminder",duration:0,detail:u.map(e=>e.desc).join(" ")}),workflowSteps=t,workflowState.lastBuiltAt=(new Date).toISOString(),workflowState.index>=workflowSteps.length)workflowState.index=0,workflowState.remaining=workflowSteps[0]?.duration||0,workflowState.stepDuration=workflowSteps[0]?.duration||0;else{const e=workflowSteps[workflowState.index];e&&(workflowState.stepDuration=e.duration||0,workflowState.running||(workflowState.remaining=e.duration||0))}renderWorkflowSteps(),updateWorkflowUI()}function renderWorkflowSteps(){const e=document.getElementById("workflow-body");e&&(workflowSteps.length?e.innerHTML=workflowSteps.map((e,t)=>{const a=t<workflowState.index?"wf-row done":t===workflowState.index?"wf-row active":"wf-row",n=e.duration>0?formatClock(e.duration):"Manual";const actualInfo=workflowState.stepActualLog&&workflowState.stepActualLog[t];const actualLine=actualInfo?`<div class="wf-desc" style="color:var(--teal);font-size:10.5px;margin-top:2px">⏱ Actual: ${actualInfo.elapsedMin}m ${actualInfo.elapsedSec}s (planned ${actualInfo.plannedMin}m) · ${actualInfo.start}–${actualInfo.end}</div>`:"";return`<div class="${a}">\n      <div class="wf-num">${e.n}</div>\n      <div>\n        <div class="wf-name">${e.name}</div>\n        <div class="wf-desc">${e.detail}</div>\n        ${actualLine}\n      </div>\n      <div class="wf-time">${n}</div>\n    </div>`}).join(""):e.innerHTML='<div class="wf-muted">No workflow built yet.</div>')}function logWorkflow(e,t){const a=document.getElementById("wf-log");if(!a)return;const n=(new Date).toLocaleTimeString([],{hour:"numeric",minute:"2-digit",second:"2-digit"}),o=document.createElement("div");o.className="wf-log-item",o.innerHTML=`<div><strong>${t||"Workflow"}</strong></div><div>${e}</div><div class="wf-muted">${n}</div>`,a.prepend(o)}function getWorkflowAudioContext(){try{return workflowState.audioCtx||(workflowState.audioCtx=new(window.AudioContext||window.webkitAudioContext)),"suspended"===workflowState.audioCtx.state&&workflowState.audioCtx.resume(),workflowState.audioCtx}catch(e){return null}}function beepWorkflow(e){try{const t=getWorkflowAudioContext();if(!t)return;(Array.isArray(e)&&e.length?e:[0,.22,.46]).forEach((e,a)=>{const n=t.createOscillator(),o=t.createGain();n.type="square",n.frequency.value=1===a?740:880,o.gain.value=1e-4,n.connect(o),o.connect(t.destination);const l=t.currentTime+e;n.start(l),o.gain.setValueAtTime(1e-4,l),o.gain.exponentialRampToValueAtTime(.06,l+.01),o.gain.exponentialRampToValueAtTime(1e-4,l+.18),n.stop(l+.2)})}catch(e){}}function stopWorkflowAlarm(){workflowState.alarmActive=!1,workflowState.alarmTimer&&clearInterval(workflowState.alarmTimer),workflowState.alarmTimer=null}function startWorkflowAlarm(){stopWorkflowAlarm(),workflowState.alarmActive=!0,beepWorkflow(),workflowState.alarmTimer=setInterval(()=>beepWorkflow(),1800)}function syncWorkflowToRunnableStep(e){if(!workflowSteps.length)return null;let t=workflowSteps[workflowState.index]||workflowSteps[0];for(;t&&t.duration<=0&&workflowState.index<workflowSteps.length-1;)logWorkflow(`${e||"Auto-advanced past"} ${t.name}.`,"Workflow"),workflowState.index+=1,t=workflowSteps[workflowState.index],workflowState.remaining=t?.duration||0,workflowState.stepDuration=t?.duration||0;return t}function startWorkflow(){if(stopWorkflowAlarm(),workflowSteps.length||buildWorkflow(),!workflowSteps.length)return;let e=workflowSteps[workflowState.index]||workflowSteps[0];e&&(e.duration<=0&&(e=syncWorkflowToRunnableStep("Auto-advanced past")),e?(workflowState.remaining=workflowState.remaining>0?workflowState.remaining:e.duration||0,workflowState.stepDuration=e.duration||0,workflowState.remaining<=0&&e.duration>0&&(workflowState.remaining=e.duration),workflowState.running=!0,workflowState.timer&&clearInterval(workflowState.timer),workflowState.stepStartWallTime=new Date(),workflowState.timer=setInterval(tickWorkflow,1e3),logWorkflow(`Timer started for ${e.name} at ${workflowState.stepStartWallTime.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}.`,"Started"),updateWorkflowUI()):updateWorkflowUI())}function pauseWorkflow(){stopWorkflowAlarm();workflowState.running=!1,workflowState.timer&&clearInterval(workflowState.timer),workflowState.timer=null,updateWorkflowUI()}function resetWorkflowTimer(){stopWorkflowAlarm(),pauseWorkflow(),workflowState.index=0,workflowState.remaining=workflowSteps[0]?.duration||0,workflowState.stepDuration=workflowSteps[0]?.duration||0,workflowState.stepStartWallTime=null,workflowState.stepActualLog={},document.getElementById("wf-log").innerHTML="";const f=document.getElementById("wf-float");f&&f.classList.remove("alarm-flash"),updateWorkflowUI(),renderWorkflowSteps()}function nextWorkflowStep(e){stopWorkflowAlarm();const f=document.getElementById("wf-float");f&&f.classList.remove("alarm-flash");const t=workflowSteps[workflowState.index];if(t&&(e?logWorkflow(`${t.name} complete.`,"Completed"):logWorkflow(`Manually advanced past ${t.name}.`,"Skipped Ahead")),workflowState.index<workflowSteps.length-1){workflowState.index+=1;const e=workflowSteps[workflowState.index];workflowState.remaining=e.duration||0,workflowState.stepDuration=e.duration||0,beepWorkflow([0]),(function(){
+let workflowSteps=[],workflowState={index:0,remaining:0,running:!1,timer:null,stepDuration:0,lastBuiltAt:null,alarmActive:!1,alarmTimer:null,audioCtx:null,stepStartWallTime:null,stepActualLog:{}};function parseTimeToMinutes(e){if(!e)return 0;const t=String(e).match(/(\d+)\s*min/i);return t?parseInt(t[1],10):0}function formatClock(e){const t=Math.max(0,Math.round(e||0));return`${String(Math.floor(t/60)).padStart(2,"0")}:${String(t%60).padStart(2,"0")}`}function inferChillTargetTemp(){const e=val("wf-chill-temp");if(e>0)return e;const t=document.getElementById("yi-temp")?.textContent||"",a=t.match(/(\d+)\s*-\s*(\d+)/);if(a)return parseInt(a[1],10);const n=t.match(/(\d+)/);return n?parseInt(n[1],10):68}function collectHopEvents(){val("bh-boil-time");const e=[];return document.querySelectorAll('[id^="hop-row-"]').forEach(t=>{const a=t.id.replace("hop-row-",""),n=sel(`h-name-${a}`)||"Hop Addition",o=val(`h-oz-${a}`)||0,l=sel(`h-sched-${a}`)||"",i=document.getElementById(`h-notes-${a}`)?.value||"";if(o<=0)return;const s=l.toLowerCase();if(s.includes("dry"))return void e.push({key:`dry-${a}`,label:`Dry hop — ${n}`,remain:-999,type:"post",desc:`Add ${f2(o)} oz ${n} during dry hop. ${i}`.trim()});if(s.includes("whirlpool"))return void e.push({key:`wp-${a}`,label:`Whirlpool hop — ${n}`,remain:0,type:"whirlpool",desc:`Add ${f2(o)} oz ${n} at whirlpool. ${i}`.trim()});if(s.includes("flameout")||s.startsWith("0 min"))return void e.push({key:`fo-${a}`,label:`Flameout hop — ${n}`,remain:0,type:"flameout",desc:`Add ${f2(o)} oz ${n} at flameout. ${i}`.trim()});const r=parseSchedule(l);e.push({key:`boil-${a}`,label:`Add ${n}`,remain:r,type:"boil",desc:`Add ${f2(o)} oz ${n} with ${r} min left in the boil. ${i}`.trim()})}),e.sort((e,t)=>"post"===e.type?1:"post"===t.type?-1:(t.remain||0)-(e.remain||0))}function buildWorkflow(){const e=document.getElementById("wf-chill-temp");e&&(!e.value||+e.value<=0)&&(e.value=inferChillTargetTemp());const t=[];let a=1;const n=document.getElementById("res-strike-vol")?.textContent||"—",o=document.getElementById("res-strike-temp")?.textContent||"—",l=val("bh-mash-time")||0;t.push({n:a++,name:"Heat strike water",duration:0,detail:`Heat strike water to ${o} for ${n}. Manual hold step.`}),l>0&&t.push({n:a++,name:"Mash in / dough in",duration:60*l,detail:"Mash in, eliminate dough balls, verify target mash temp, and stabilize the bed."});const i=sel("mashProfile"),s=MASH_PROFILES.find(e=>e.name===i);s&&s.steps?.length&&s.steps.forEach((e,n)=>{let o=e.temp||"";0===n&&val("mashTemp")>0&&(o=`${val("mashTemp")}°F`);const l=parseTimeToMinutes(e.time);t.push({n:a++,name:e.name,duration:60*l,detail:`Hold at ${o||"target temp"} for ${e.time}. ${e.desc||""}`.trim()})});const r=val("wf-sparge-min")||0;t.push({n:a++,name:"Recirculate / vorlauf",duration:0,detail:"Manual check step: clear wort and confirm run-off before sparging."}),r>0&&t.push({n:a++,name:"Sparge",duration:60*r,detail:"Sparge to hit pre-boil volume and gravity targets."}),t.push({n:a++,name:"Bring wort to boil",duration:0,detail:"Manual hold step: watch for hot break and confirm steady boil before starting boil timer."});const c=val("bh-boil-time")||60,d=[...collectHopEvents().filter(e=>"post"!==e.type).map(e=>({remain:e.remain,label:e.label,desc:e.desc,type:e.type})),{remain:0,label:"Boil complete",desc:"Turn off heat and move to flameout / whirlpool steps.",type:"complete"}];d.sort((e,t)=>(t.remain||0)-(e.remain||0));let m=c;d.some(e=>e.remain===c)||t.push({n:a++,name:"Start boil",duration:0,detail:`Start ${c}-minute boil timer.`}),d.forEach(e=>{const n=m-(e.remain||0);if(n>0&&t.push({n:a++,name:`Boil countdown — ${m} to ${e.remain} min`,duration:60*n,detail:`Boil until ${e.remain} min remain.`}),"boil"===e.type&&t.push({n:a++,name:e.label,duration:0,detail:e.desc}),"flameout"===e.type&&t.push({n:a++,name:e.label,duration:0,detail:e.desc}),"whirlpool"===e.type){const n=val("wf-whirlpool-min")||0;t.push({n:a++,name:e.label,duration:0,detail:e.desc}),n>0&&t.push({n:a++,name:"Whirlpool hold",duration:60*n,detail:`Maintain whirlpool for ${n} min before chilling.`})}m=e.remain||0});const g=val("wf-chill-temp")||68;t.push({n:a++,name:"Chill wort",duration:0,detail:`Cool wort to ${g}°F and transfer to fermenter. Manual hold step.`});const u=collectHopEvents().filter(e=>"post"===e.type);if(u.length&&t.push({n:a++,name:"Dry hop reminder",duration:0,detail:u.map(e=>e.desc).join(" ")}),workflowSteps=t,workflowState.lastBuiltAt=(new Date).toISOString(),workflowState.index>=workflowSteps.length)workflowState.index=0,workflowState.remaining=workflowSteps[0]?.duration||0,workflowState.stepDuration=workflowSteps[0]?.duration||0;else{const e=workflowSteps[workflowState.index];e&&(workflowState.stepDuration=e.duration||0,workflowState.running||(workflowState.remaining=e.duration||0))}renderWorkflowSteps(),updateWorkflowUI()}function renderWorkflowSteps(){const e=document.getElementById("workflow-body");e&&(workflowSteps.length?e.innerHTML=workflowSteps.map((e,t)=>{const a=t<workflowState.index?"wf-row done":t===workflowState.index?"wf-row active":"wf-row",n=e.duration>0?formatClock(e.duration):"Manual";const actualInfo=workflowState.stepActualLog&&workflowState.stepActualLog[t];const actualLine=actualInfo?`<div class="wf-desc" style="color:var(--teal);font-size:10.5px;margin-top:2px">⏱ Actual: ${actualInfo.elapsedMin}m ${actualInfo.elapsedSec}s (planned ${actualInfo.plannedMin}m) · ${actualInfo.start}–${actualInfo.end}</div>`:"";return`<div class="${a}">\n      <div class="wf-num">${e.n}</div>\n      <div>\n        <div class="wf-name">${e.name}</div>\n        <div class="wf-desc">${e.detail}</div>\n        ${actualLine}\n      </div>\n      <div class="wf-time">${n}</div>\n    </div>`}).join(""):e.innerHTML='<div class="wf-muted">No workflow built yet.</div>')}function logWorkflow(e,t){const a=document.getElementById("wf-log");if(!a)return;const n=(new Date).toLocaleTimeString([],{hour:"numeric",minute:"2-digit",second:"2-digit"}),o=document.createElement("div");o.className="wf-log-item",o.innerHTML=`<div><strong>${t||"Workflow"}</strong></div><div>${e}</div><div class="wf-muted">${n}</div>`,a.prepend(o)}function getWorkflowAudioContext(){try{return workflowState.audioCtx||(workflowState.audioCtx=new(window.AudioContext||window.webkitAudioContext)),"suspended"===workflowState.audioCtx.state&&workflowState.audioCtx.resume(),workflowState.audioCtx}catch(e){return null}}function beepWorkflow(e){try{const t=getWorkflowAudioContext();if(!t)return;(Array.isArray(e)&&e.length?e:[0,.22,.46]).forEach((e,a)=>{const n=t.createOscillator(),o=t.createGain();n.type="square",n.frequency.value=1===a?740:880,o.gain.value=1e-4,n.connect(o),o.connect(t.destination);const l=t.currentTime+e;n.start(l),o.gain.setValueAtTime(1e-4,l),o.gain.exponentialRampToValueAtTime(.06,l+.01),o.gain.exponentialRampToValueAtTime(1e-4,l+.18),n.stop(l+.2)})}catch(e){}}function stopWorkflowAlarm(){workflowState.alarmActive=!1,workflowState.alarmTimer&&clearInterval(workflowState.alarmTimer),workflowState.alarmTimer=null}function startWorkflowAlarm(){stopWorkflowAlarm(),workflowState.alarmActive=!0,beepWorkflow(),workflowState.alarmTimer=setInterval(()=>beepWorkflow(),1800)}function syncWorkflowToRunnableStep(e){if(!workflowSteps.length)return null;let t=workflowSteps[workflowState.index]||workflowSteps[0];for(;t&&t.duration<=0&&workflowState.index<workflowSteps.length-1;)logWorkflow(`${e||"Auto-advanced past"} ${t.name}.`,"Workflow"),workflowState.index+=1,t=workflowSteps[workflowState.index],workflowState.remaining=t?.duration||0,workflowState.stepDuration=t?.duration||0;return t}function startWorkflow(){if(stopWorkflowAlarm(),workflowSteps.length||buildWorkflow(),!workflowSteps.length)return;let e=workflowSteps[workflowState.index]||workflowSteps[0];e&&(e.duration<=0&&(e=syncWorkflowToRunnableStep("Auto-advanced past")),e?(workflowState.remaining=workflowState.remaining>0?workflowState.remaining:e.duration||0,workflowState.stepDuration=e.duration||0,workflowState.remaining<=0&&e.duration>0&&(workflowState.remaining=e.duration),workflowState.running=!0,workflowState.timer&&clearInterval(workflowState.timer),workflowState.stepStartWallTime=new Date(),workflowState.timer=setInterval(tickWorkflow,1e3),logWorkflow(`Timer started for ${e.name} at ${workflowState.stepStartWallTime.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}.`,"Started"),updateWorkflowUI()):updateWorkflowUI())}function pauseWorkflow(){stopWorkflowAlarm();workflowState.running=!1,workflowState.timer&&clearInterval(workflowState.timer),workflowState.timer=null,updateWorkflowUI()}function resetWorkflowTimer(){stopWorkflowAlarm(),pauseWorkflow(),workflowState.index=0,workflowState.remaining=workflowSteps[0]?.duration||0,workflowState.stepDuration=workflowSteps[0]?.duration||0,workflowState.stepStartWallTime=null,workflowState.stepActualLog={},window._hopChecked={},document.getElementById("wf-log").innerHTML="";const f=document.getElementById("wf-float");f&&f.classList.remove("alarm-flash"),updateWorkflowUI(),renderWorkflowSteps()}function nextWorkflowStep(e){stopWorkflowAlarm();const f=document.getElementById("wf-float");f&&f.classList.remove("alarm-flash");const t=workflowSteps[workflowState.index];if(t&&(e?logWorkflow(`${t.name} complete.`,"Completed"):logWorkflow(`Manually advanced past ${t.name}.`,"Skipped Ahead")),workflowState.index<workflowSteps.length-1){workflowState.index+=1;const e=workflowSteps[workflowState.index];workflowState.remaining=e.duration||0,workflowState.stepDuration=e.duration||0,beepWorkflow([0]),(function(){
   const nowStr=new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
   workflowState.stepStartWallTime = e.duration > 0 ? new Date() : null;
   const startNote = e.duration > 0 ? ` (started ${nowStr})` : ` (manual step — ${nowStr})`;
@@ -3156,7 +3197,143 @@ let workflowSteps=[],workflowState={index:0,remaining:0,running:!1,timer:null,st
     workflowState.stepStartWallTime=null;
   }
   logWorkflow(`${stepName} timer complete. Click Next to continue.${actualMsg}`,"Timer Done");
-})(),startWorkflowAlarm(),updateWorkflowUI())}else pauseWorkflow()}function updateWorkflowUI(){const e=workflowSteps.length,t=workflowSteps[workflowState.index],a=workflowSteps[workflowState.index+1],n=t?t.duration>0?formatClock(workflowState.remaining||t.duration):"Manual":"00:00";set("wf-step-count",`${e?workflowState.index+1:0} / ${e}`),set("wf-current-name",t?t.name:"Build workflow"),set("wf-current-desc",t?t.detail:"Generate your brewday timeline from the recipe tab."),set("wf-now-title",t?t.name:"Ready when you are"),set("wf-now-text",workflowState.alarmActive&&t?"Timer complete — buzzer sounding. Click Next to continue.":t?t.detail:"Build the workflow and press Start to begin the timer."),set("wf-time-left",n),(function(){
+})(),startWorkflowAlarm(),updateWorkflowUI())}else pauseWorkflow()}
+// ── Hop Schedule Helpers ─────────────────────────────────────────────────────
+
+// Build a flat list of boil hop events with their "boil minutes remaining" timing
+function getBoilHopEvents(){
+  const hops=[];
+  document.querySelectorAll('[id^="hop-row-"]').forEach(row=>{
+    const id=row.id.replace('hop-row-','');
+    const name=document.getElementById('h-name-'+id)?.value||'Hop';
+    const oz=parseFloat(document.getElementById('h-oz-'+id)?.value)||0;
+    const sched=document.getElementById('h-sched-'+id)?.value||'';
+    if(oz<=0) return;
+    const s=sched.toLowerCase();
+    if(s.includes('dry')) return; // dry hops not part of boil schedule
+    let remain=0, label='';
+    if(s.includes('whirlpool')){remain=0;label='Whirlpool';}
+    else if(s.includes('flameout')||s.startsWith('0 min')){remain=0;label='Flameout';}
+    else{const m=sched.match(/(\d+)/);remain=m?parseInt(m[1]):60;label=remain+' min';}
+    hops.push({name,oz,remain,label,key:'hop-'+id,done:false});
+  });
+  return hops.sort((a,b)=>b.remain-a.remain);
+}
+
+// State: which hops have been manually checked off
+if(!window._hopChecked) window._hopChecked={};
+
+// Compute how many seconds until each hop step based on current workflow position
+function getSecsUntilStep(stepIdx){
+  let secs=workflowState.remaining||0;
+  for(let i=workflowState.index+1;i<stepIdx;i++){
+    secs+=(workflowSteps[i]?.duration||0);
+  }
+  return secs;
+}
+
+function isHopStep(step){
+  if(!step) return false;
+  const n=step.name.toLowerCase();
+  return n.includes('add ')&&(n.includes('hop')||document.querySelectorAll('[id^="hop-row-"]').length>0)
+      || (step.detail||'').toLowerCase().includes('oz');
+}
+
+function isBoilActive(){
+  // We're in boil if the current or a recent step name includes "boil"
+  for(let i=Math.max(0,workflowState.index-2);i<=workflowState.index;i++){
+    if((workflowSteps[i]?.name||'').toLowerCase().includes('boil')) return true;
+  }
+  // Also if any future steps are boil countdowns
+  for(let i=workflowState.index;i<workflowSteps.length;i++){
+    if((workflowSteps[i]?.name||'').toLowerCase().includes('boil countdown')) return true;
+  }
+  return false;
+}
+
+function renderHopScheduleCard(){
+  const card=document.getElementById('wf-hop-schedule-card');
+  const list=document.getElementById('wf-hop-schedule-list');
+  if(!card||!list) return;
+
+  const hops=getBoilHopEvents();
+  if(!hops.length||!workflowState.running&&workflowState.index===0){
+    card.classList.remove('visible');
+    return;
+  }
+  card.classList.add('visible');
+
+  // For each hop, find the matching workflow step to compute seconds remaining
+  const stepMap={};
+  workflowSteps.forEach((step,idx)=>{
+    if(!isHopStep(step)) return;
+    hops.forEach(h=>{
+      if(step.detail&&step.detail.includes(h.name)&&step.detail.includes(h.oz.toString().substring(0,3))){
+        if(!stepMap[h.key]) stepMap[h.key]={idx,step};
+      }
+    });
+  });
+
+  list.innerHTML=hops.map(h=>{
+    const isDone=window._hopChecked[h.key]||
+      (stepMap[h.key]&&stepMap[h.key].idx<workflowState.index);
+    let secsUntil=null;
+    let isNext=false, isWarn=false;
+    if(!isDone&&stepMap[h.key]){
+      secsUntil=getSecsUntilStep(stepMap[h.key].idx);
+      // Find the first non-done hop
+    }
+    // Determine "next up" = first non-done hop in schedule order
+    return {h,isDone,secsUntil,key:h.key};
+  }).sort((a,b)=>{
+    if(a.isDone!==b.isDone) return a.isDone?1:-1;
+    return b.h.remain-a.h.remain;
+  }).map(({h,isDone,secsUntil},i,arr)=>{
+    const firstPending=arr.find(x=>!x.isDone);
+    const isNext=!isDone&&firstPending&&firstPending.h.key===h.key;
+    const isWarn=!isDone&&secsUntil!==null&&secsUntil<=120&&secsUntil>=0;
+    let badgeText='';
+    if(isDone) badgeText='✓ Done';
+    else if(secsUntil!==null&&secsUntil>0) badgeText='in '+formatClock(secsUntil);
+    else if(secsUntil===0||secsUntil<0) badgeText='Now!';
+    else badgeText=h.label;
+    const cls='wf-hop-item'+(isDone?' done':'')+(isNext&&!isDone?' next-up':'')+(isWarn?' warning':'');
+    return `<div class="${cls}">
+      <div class="wf-hop-dot"></div>
+      <div class="wf-hop-name">${h.name} <span class="wf-hop-sched">${h.oz} oz</span></div>
+      <div class="wf-hop-badge">${badgeText}</div>
+      <div class="wf-hop-check" onclick="toggleHopDone('${h.key}')" title="${isDone?'Mark undone':'Mark done'}">${isDone?'✓':'○'}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleHopDone(key){
+  window._hopChecked[key]=!window._hopChecked[key];
+  renderHopScheduleCard();
+}
+
+// Get the next pending boil hop and seconds until it fires
+function getNextHopInfo(){
+  const hops=getBoilHopEvents();
+  if(!hops.length) return null;
+  for(let hi=0;hi<hops.length;hi++){
+    const h=hops[hi];
+    if(window._hopChecked[h.key]) continue;
+    // Find matching step
+    for(let si=workflowState.index;si<workflowSteps.length;si++){
+      const step=workflowSteps[si];
+      if(!isHopStep(step)) continue;
+      if(step.detail&&step.detail.includes(h.name)){
+        const secs=getSecsUntilStep(si);
+        return {name:h.name,oz:h.oz,secs,label:h.label};
+      }
+    }
+  }
+  return null;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+function updateWorkflowUI(){const e=workflowSteps.length,t=workflowSteps[workflowState.index],a=workflowSteps[workflowState.index+1],n=t?t.duration>0?formatClock(workflowState.remaining||t.duration):"Manual":"00:00";set("wf-step-count",`${e?workflowState.index+1:0} / ${e}`),set("wf-current-name",t?t.name:"Build workflow"),set("wf-current-desc",t?t.detail:"Generate your brewday timeline from the recipe tab."),set("wf-now-title",t?t.name:"Ready when you are"),set("wf-now-text",workflowState.alarmActive&&t?"Timer complete — buzzer sounding. Click Next to continue.":t?t.detail:"Build the workflow and press Start to begin the timer."),set("wf-time-left",n),(function(){
   let nextAlertName, nextAlertSub;
   if(workflowState.alarmActive){
     nextAlertName="Click Next";
@@ -3188,7 +3365,54 @@ let workflowSteps=[],workflowState={index:0,remaining:0,running:!1,timer:null,st
     floatSubText = "Press Start to begin the timer.";
   }
   set("wf-float-sub", floatSubText);
-})();const o=document.getElementById("wf-float-progress");o&&(o.style.width=l),r&&(r.textContent=workflowState.alarmActive?"⏭ Next Step":workflowState.running?"▶ Running":workflowState.index>0?"▶ Resume":"▶ Start",r.classList.toggle("alarm",!!workflowState.alarmActive))}renderWorkflowSteps()}function showTab(e,t){document.querySelectorAll(".pane").forEach(e=>e.classList.remove("active")),document.querySelectorAll(".tab").forEach(e=>e.classList.remove("active"));const a=document.getElementById(e);a&&a.classList.add("active"),t&&t.classList.add("active"),"scale"===e&&(calcScale(),calcScaleOG()),"co2tab"===e&&(calcCO2(),buildCO2Table()),"workflow"===e&&(buildWorkflow(),updateWorkflowUI()),"conversions"===e&&convertGravity(),"on-tap"===e&&renderTapBoard_init(),"lib-water"===e&&libRenderWater(),"lib-grains"===e&&libRenderGrains(),"lib-hops"===e&&libRenderHops(),"lib-yeast"===e&&libRenderYeast(),"settings"===e&&setTimeout(initCustomColorsPanel,0)}function saveData(){if(!requireLicense("Recipe file export"))return;const e={meta:{savedAt:(new Date).toISOString(),version:"3.3.9"},beerName:sel("beerName")||document.getElementById("beerName")?.value,beerStyle:sel("beerStyle"),batchNum:val("batchNum"),brewDate:document.getElementById("brewDate")?.value,og:document.getElementById("res-og")?.textContent,fg:document.getElementById("res-fg")?.textContent,abv:document.getElementById("res-abv")?.textContent,ibu:document.getElementById("res-ibu")?.textContent,srm:document.getElementById("res-srm")?.textContent,notes:document.getElementById("brewNotes")?.value,workflowSteps:workflowSteps,workflowSettings:{mashIn:val("wf-mashin-min"),sparge:val("wf-sparge-min"),whirlpool:val("wf-whirlpool-min"),chillTarget:val("wf-chill-temp")}},t=new Blob([JSON.stringify(e,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(t);const n=(e.beerName||"recipe").replace(/\s+/g,"_");a.download=`EzBrewDay_${n}_${(new Date).toISOString().split("T")[0]}.json`,a.click()}function resetAll(){
+})();const o=document.getElementById("wf-float-progress");o&&(o.style.width=l),r&&(r.textContent=workflowState.alarmActive?"⏭ Next Step":workflowState.running?"▶ Running":workflowState.index>0?"▶ Resume":"▶ Start",r.classList.toggle("alarm",!!workflowState.alarmActive));
+
+// ── Floating timer hop line ──────────────────────────
+(function(){
+  const hopEl=document.getElementById('wf-float-hop');
+  if(!hopEl) return;
+  if(!workflowState.running){hopEl.textContent='';hopEl.className='wf-float-hop';return;}
+  const nh=getNextHopInfo();
+  if(!nh){hopEl.textContent='';hopEl.className='wf-float-hop';return;}
+  const warn=nh.secs<=120&&nh.secs>=0;
+  const timeStr=nh.secs>0?'in '+formatClock(nh.secs):'NOW';
+  hopEl.textContent='🍺 Next hop: '+nh.name+' '+nh.oz+'oz — '+timeStr;
+  hopEl.className='wf-float-hop'+(warn?' warn':'');
+})();
+
+}renderWorkflowSteps();
+
+// ── Hop schedule card + step countdown badges ────────
+renderHopScheduleCard();
+(function(){
+  // Add live countdown badges to future hop steps in the step list
+  if(!workflowState.running) return;
+  document.querySelectorAll('#workflow-body .wf-row').forEach((row,idx)=>{
+    row.classList.remove('next-hop');
+    const existingBadge=row.querySelector('.wf-step-countdown');
+    if(existingBadge) existingBadge.remove();
+  });
+  const rows=document.querySelectorAll('#workflow-body .wf-row');
+  let foundNextHop=false;
+  rows.forEach((row,idx)=>{
+    const globalIdx=idx; // row index matches workflowSteps index
+    const step=workflowSteps[globalIdx];
+    if(!step||globalIdx<=workflowState.index) return;
+    if(!isHopStep(step)) return;
+    const secs=getSecsUntilStep(globalIdx);
+    const warn=secs<=120;
+    const badge=document.createElement('span');
+    badge.className='wf-step-countdown'+(warn?' warn':'');
+    badge.textContent=secs>0?'in '+formatClock(secs):'Soon!';
+    const timeEl=row.querySelector('.wf-time');
+    if(timeEl) timeEl.appendChild(badge);
+    if(!foundNextHop){
+      row.classList.add('next-hop');
+      foundNextHop=true;
+    }
+  });
+})();
+}function showTab(e,t){document.querySelectorAll(".pane").forEach(e=>e.classList.remove("active")),document.querySelectorAll(".tab").forEach(e=>e.classList.remove("active"));const a=document.getElementById(e);a&&a.classList.add("active"),t&&t.classList.add("active"),"scale"===e&&(calcScale(),calcScaleOG()),"co2tab"===e&&(calcCO2(),buildCO2Table()),"workflow"===e&&(buildWorkflow(),updateWorkflowUI()),"conversions"===e&&convertGravity(),"on-tap"===e&&renderTapBoard_init(),"lib-water"===e&&libRenderWater(),"lib-grains"===e&&libRenderGrains(),"lib-hops"===e&&libRenderHops(),"lib-yeast"===e&&libRenderYeast(),"settings"===e&&setTimeout(initCustomColorsPanel,0)}function saveData(){if(!requireLicense("Recipe file export"))return;const e={meta:{savedAt:(new Date).toISOString(),version:"3.3.9"},beerName:sel("beerName")||document.getElementById("beerName")?.value,beerStyle:sel("beerStyle"),batchNum:val("batchNum"),brewDate:document.getElementById("brewDate")?.value,og:document.getElementById("res-og")?.textContent,fg:document.getElementById("res-fg")?.textContent,abv:document.getElementById("res-abv")?.textContent,ibu:document.getElementById("res-ibu")?.textContent,srm:document.getElementById("res-srm")?.textContent,notes:document.getElementById("brewNotes")?.value,workflowSteps:workflowSteps,workflowSettings:{mashIn:val("wf-mashin-min"),sparge:val("wf-sparge-min"),whirlpool:val("wf-whirlpool-min"),chillTarget:val("wf-chill-temp")}},t=new Blob([JSON.stringify(e,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(t);const n=(e.beerName||"recipe").replace(/\s+/g,"_");a.download=`EzBrewDay_${n}_${(new Date).toISOString().split("T")[0]}.json`,a.click()}function resetAll(){
   if(!confirm('Clear everything and start a fresh blank recipe?')) return;
   // Clear all text/number inputs except settings
   document.querySelectorAll('input[type="text"],input[type="number"],input[type="date"],textarea').forEach(el=>{
